@@ -1,4 +1,4 @@
-import 'package:flutter_gherkin_parser/utils/feature_parser.dart';
+import 'package:flutter_gherkin_parser/models/gherkin_table_model.dart';
 
 /// Associates a regex fragment with a parser function for a placeholder token.
 ///

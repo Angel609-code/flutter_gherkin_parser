@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show ErrorDescription, FlutterError, FlutterErrorDetails;
 import 'package:flutter_gherkin_parser/hooks/hook_manager.dart';
 import 'package:flutter_gherkin_parser/integration_test_config.dart';
+import 'package:flutter_gherkin_parser/models/step_model.dart';
 import 'package:flutter_gherkin_parser/steps/steps_registry.dart';
-import 'package:flutter_gherkin_parser/utils/feature_parser.dart';
 import 'package:flutter_gherkin_parser/utils/terminal_colors.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
 
