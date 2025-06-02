@@ -25,6 +25,7 @@ class StepsRegistry {
         return (world) => stepDef.run(cleanedStepText, world);
       }
     }
+
     return null;
   }
 
