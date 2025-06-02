@@ -37,47 +37,62 @@ class IntegrationTestHelper {
 
   WidgetTesterWorld get world => _world;
 
-  Future<void> runStepsForScenario(WidgetTester tester, String scenarioName, List<String> stepNames) async {
+  Future<void> setUp(WidgetTester tester, {List<String> stepNames = const <String>[]}) async {
     await _world.setTester(tester);
+    await config.appLauncher.call(_world.tester);
+
+    if (stepNames.isNotEmpty) {
+      await _performScenarioOrBackground(
+        run: () async {
+          for (final step in stepNames) {
+            await _executeStep(step, true);
+          }
+        },
+        isBackground: true,
+      );
+    }
+  }
+
+  Future<void> runStepsForScenario(String scenarioName, List<String> stepNames) async {
     await _hookManager.beforeScenario(scenarioName);
 
-    await _performScenario(
+    await _performScenarioOrBackground(
       run: () async {
-        await config.appLauncher.call(_world.tester);
         for (final step in stepNames) {
-          await _executeStep(step);
+          await _executeStep(step, false);
         }
       },
       after: () async {
         await performTestCleanup();
       },
-      scenarioName: scenarioName,
+      title: scenarioName,
     );
 
     await hookManager.afterScenario(scenarioName);
   }
 
-  Future<void> _performScenario({
+  Future<void> _performScenarioOrBackground({
     required Future<void> Function() run,
-    required Future<void> Function() after,
-    required String scenarioName,
+    Future<void> Function()? after,
+    String? title,
+    bool isBackground = false
   }) async {
     try {
       await run();
     } catch (error, stackTrace) {
-      await _handleTestError(error, stackTrace, scenarioName);
+      await _handleTestError(error, stackTrace, title, isBackground);
     } finally {
-      await after();
+      await after?.call();
     }
   }
 
-  Future<void> _executeStep(String stepText) async {
+  Future<void> _executeStep(String stepText, bool isBackground) async {
     final Step step = Step(text: stepText);
     await _hookManager.beforeStep(step.text, _world);
 
     final stepFunction = StepsRegistry.getStep(step.text);
     if (stepFunction != null) {
-      print('${yellow}Executing step: ${step.text}$reset');
+      print('${isBackground ? orange : yellow}Executing ${isBackground ? 'background ' : ' '}step: ${step.text}$reset');
       await stepFunction(_world);
       await _hookManager.afterStep(step.text, _world);
     } else {
@@ -99,15 +114,15 @@ class IntegrationTestHelper {
     }
   }
 
-  Future<void> _handleTestError(dynamic error, StackTrace stackTrace, String scenarioName) async {
-    print('${red}Error in scenario "$scenarioName": $error.$reset');
+  Future<void> _handleTestError(dynamic error, StackTrace stackTrace, String? title, bool isBackground) async {
+    print('${red}Error in ${isBackground ? 'background' : 'scenario'}: $error.$reset');
 
     FlutterError.reportError(
       FlutterErrorDetails(
         exception: error,
         stack: stackTrace,
         context: ErrorDescription(
-          'Error during integration test for scenario "$scenarioName"',
+          'Error during integration test for ${isBackground ? 'background' : 'scenario: "$title"'}',
         ),
       ),
     );

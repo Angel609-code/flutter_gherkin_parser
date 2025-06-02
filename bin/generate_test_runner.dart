@@ -60,6 +60,7 @@ Future<void> main(List<String> args) async {
   final templateUri = await Isolate.resolvePackageUri(
     Uri.parse('package:flutter_gherkin_parser/templates/test_runner_template.mustache'),
   );
+
   if (templateUri == null) {
     stderr.writeln(
       'Cannot resolve package URI for '
@@ -67,11 +68,13 @@ Future<void> main(List<String> args) async {
     );
     exit(2);
   }
+
   final templateFile = File.fromUri(templateUri);
   if (!templateFile.existsSync()) {
     stderr.writeln('Cannot find template at ${templateFile.path}');
     exit(2);
   }
+
   final templateContent = templateFile.readAsStringSync();
   final template = Template(templateContent, htmlEscapeValues: false);
 
@@ -79,6 +82,19 @@ Future<void> main(List<String> args) async {
   for (final featureFile in featureFiles) {
     final raw = featureFile.readAsStringSync();
     final feature = parser.parse(raw);
+
+    // Reject any file that has more than one "Background:" line.
+    final backgroundCount = RegExp(r'^\s*Background:', multiLine: true)
+        .allMatches(raw)
+        .length;
+
+    if (backgroundCount > 1) {
+      stderr.writeln(
+          'Error: More than one Background section found in "${featureFile.path}".\n'
+              'A feature file may have at most one Background block.'
+      );
+      exit(1);
+    }
 
     // Prepare the scenarios list with `isLast` flag
     final scenarioMaps = <Map<String, dynamic>>[];
@@ -100,6 +116,10 @@ Future<void> main(List<String> args) async {
     final featureData = {
       'name': feature.name,
       'scenarios': scenarioMaps,
+      'backgroundSteps': feature.background?.steps.map((s) {
+        final decoded = parse(s.text).documentElement?.text ?? s.text;
+        return {'text': decoded};
+      }).toList() ?? [],
     };
 
     final data = {
@@ -129,5 +149,5 @@ Future<void> main(List<String> args) async {
     stdout.writeln('Generated $outFilePath');
   }
 
-  stdout.writeln('\n✅ All runners generated successfully.');
+  stdout.writeln('\n✅  All runners generated successfully.');
 }
