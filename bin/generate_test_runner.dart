@@ -120,6 +120,7 @@ Future<void> main(List<String> args) async {
         final decoded = parse(s.text).documentElement?.text ?? s.text;
         return {'text': decoded};
       }).toList() ?? [],
+      'hasBackgroundSteps': feature.background?.steps.isNotEmpty ?? false,
     };
 
     final data = {
