@@ -30,6 +30,9 @@ class IntegrationTestHelper {
     _world = WidgetTesterWorld();
     _world.initialize(onBindingInitialized: config.onBindingInitialized);
 
+    StepsRegistry.resetToDefaults();
+    StepsRegistry.addAll(config.steps);
+
     init();
   }
 
@@ -108,7 +111,7 @@ class IntegrationTestHelper {
       _world.binding.resetEpoch();
       _world.binding.resetFirstFrameSent();
 
-      print('${green}Test cleanup and navigation completed.$reset');
+      print('${green}Test cleanup completed.$reset');
     } catch (error) {
       print('${red}Failed during test cleanup: $error.$reset');
     }
