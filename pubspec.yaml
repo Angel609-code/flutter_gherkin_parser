@@ -23,6 +23,7 @@ dev_dependencies:
 
 executables:
   generate_test_runner: bin/generate_test_runner.dart
+  run_integration_tests: bin/run_integration_tests.dart
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

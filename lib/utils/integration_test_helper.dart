@@ -14,6 +14,7 @@ class IntegrationTestHelper {
   final IntegrationTestConfig config;
   final List<String> backgroundSteps;
   final Map<String, List<String>> scenariosAndSteps;
+  final bool startRunningAllTests;
 
   late final HookManager _hookManager;
   late final WidgetTesterWorld _world;
@@ -32,9 +33,17 @@ class IntegrationTestHelper {
 
   IntegrationTestHelper({
     required this.config,
-    required this.scenariosAndSteps,
-    this.backgroundSteps = const <String>[]
+    this.scenariosAndSteps = const <String, List<String>>{},
+    this.backgroundSteps = const <String>[],
+    this.startRunningAllTests = false,
   }) {
+    if (startRunningAllTests) {
+      _hookManager = HookManager(config.hooks);
+
+      init();
+      return;
+    }
+
     _hookManager = HookManager(config.hooks);
 
     _world = WidgetTesterWorld();
@@ -43,8 +52,15 @@ class IntegrationTestHelper {
     StepsRegistry.resetToDefaults();
     StepsRegistry.addAll(config.steps);
 
-    init();
+    if (config.runningSingleTest) {
+      init();
+    }
   }
+
+  factory IntegrationTestHelper.runAllTest(IntegrationTestConfig config) => IntegrationTestHelper(
+    config: config,
+    startRunningAllTests: true,
+  );
 
   HookManager get hookManager => _hookManager;
 

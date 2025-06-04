@@ -38,6 +38,9 @@ class IntegrationTestConfig {
   /// Leave empty for now.
   final List<StepDefinitionGeneric> steps;
 
+  /// A param that let know the hooks that is running a single test or more than one
+  bool runningSingleTest = true;
+
   IntegrationTestConfig({
     required this.appLauncher,
     this.onBindingInitialized,
