@@ -5,18 +5,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_gherkin_parser/utils/integration_test_helper.dart';
 
 void main() async {
-  final helper = IntegrationTestHelper(config);
+  final helper = IntegrationTestHelper(
+    config: config,
+    scenariosAndSteps: _scenariosAndSteps,
+  );
 
   group('Feature: Testing the fill text form field 2', () {
     testWidgets('Scenario: Second example of escenario', (WidgetTester tester) async {
-      await helper.setUp(tester);
-
-      await helper.runStepsForScenario('Second example of escenario', [
-        'And I fill the "search" field with "Tofu"',
-        'And I check non-grouping',
-        'And I check non-grouping with this as param',
-        'Then I print "hello" or maybe this non-grouping with this as param or this two',
-      ]);
+      await helper.setUp(tester, 'Second example of escenario');
+      await helper.runStepsForScenario();
     });
   });
 }
+
+final Map<String, List<String>> _scenariosAndSteps = {
+  'Second example of escenario': [
+    r'''{"text":"And I fill the \"search\" field with \"Tofu\"","source":"/features/subfolder/test_second_example.feature:4"}''',
+    r'''{"text":"And I check non-grouping","source":"/features/subfolder/test_second_example.feature:5"}''',
+    r'''{"text":"And I check non-grouping with this as param","source":"/features/subfolder/test_second_example.feature:6"}''',
+    r'''{"text":"Then I print \"hello\" or maybe this non-grouping with this as param or this two","source":"/features/subfolder/test_second_example.feature:7"}''',
+  ],
+};

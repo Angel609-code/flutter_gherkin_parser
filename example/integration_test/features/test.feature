@@ -7,7 +7,7 @@ Background:
         |N|Nombre|estado|
         |1|John  |0     |
         |2|Jean  |1     |
-    And I click in input with key "deletePost"
+    And I click in input with key "floatingButton"
 
 Scenario: Filling input
     And I fill the "search" field with "Tofu"

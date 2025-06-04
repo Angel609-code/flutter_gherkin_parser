@@ -30,7 +30,7 @@ class MainApp extends StatelessWidget {
       ),
       home: ScrollConfiguration(
         behavior: NoScrollbarBehavior(),
-        child: Feed(currentUser: data.user_0),
+        child: SafeArea(child: Feed(currentUser: data.user_0)),
       ),
       debugShowCheckedModeBanner: false,
     );
@@ -136,7 +136,10 @@ class _FeedState extends State<Feed> with SingleTickerProviderStateMixin {
           floatingActionButton: AnimatedFloatingActionButton(
             animation: _barAnimation,
             onPressed: () {},
-            child: const Icon(Icons.add),
+            child: const Icon(
+              key: Key('floatingButton'),
+              Icons.add,
+            ),
           ),
           bottomNavigationBar: DisappearingBottomNavigationBar(
             barAnimation: _barAnimation,

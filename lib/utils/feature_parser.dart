@@ -2,7 +2,7 @@ import 'package:flutter_gherkin_parser/models/models.dart';
 import 'package:flutter_gherkin_parser/utils/steps_keywords.dart';
 
 class FeatureParser {
-  Feature parse(String content) {
+  Feature parse(String content, String featurePath) {
     final rawLines = content.split('\n');
     Feature? feature;
     Scenario? currentScenario;
@@ -85,7 +85,11 @@ class FeatureParser {
         }
 
         // Now create the Step with the combined text
-        final step = Step(text: stepText);
+        final step = Step(
+          text: stepText,
+          source: '/features/$featurePath:${i + 1}',
+        );
+
         if (inBackground) {
           feature?.background?.steps.add(step);
         } else {

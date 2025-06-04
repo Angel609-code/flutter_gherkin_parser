@@ -2,7 +2,6 @@
 
 import 'dart:io';
 import 'dart:isolate';
-import 'package:html/parser.dart';
 import 'package:mustache_template/mustache_template.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_gherkin_parser/utils/feature_parser.dart';
@@ -80,8 +79,10 @@ Future<void> main(List<String> args) async {
 
   // Generate one runner per feature, preserving subfolder structure
   for (final featureFile in featureFiles) {
+    // Compute the feature’s path relative to `featuresDir`
+    final relPath = p.relative(featureFile.path, from: featuresDir.path);
     final raw = featureFile.readAsStringSync();
-    final feature = parser.parse(raw);
+    final feature = parser.parse(raw, relPath);
 
     // Reject any file that has more than one "Background:" line.
     final backgroundCount = RegExp(r'^\s*Background:', multiLine: true)
@@ -105,8 +106,7 @@ Future<void> main(List<String> args) async {
       scenarioMaps.add({
         'name': scenario.name,
         'steps': scenario.steps.map((s) {
-          final decoded = parse(s.text).documentElement?.text ?? s.text;
-          return {'text': decoded};
+          return {'json': s.toString()};
         }).toList(),
         'isLast': isLast,
       });
@@ -117,8 +117,7 @@ Future<void> main(List<String> args) async {
       'name': feature.name,
       'scenarios': scenarioMaps,
       'backgroundSteps': feature.background?.steps.map((s) {
-        final decoded = parse(s.text).documentElement?.text ?? s.text;
-        return {'text': decoded};
+        return { 'jsonStep': s.toString() };
       }).toList() ?? [],
       'hasBackgroundSteps': feature.background?.steps.isNotEmpty ?? false,
     };
@@ -130,8 +129,6 @@ Future<void> main(List<String> args) async {
 
     final rendered = template.renderString(data);
 
-    // Compute the feature’s path relative to `featuresDir`
-    final relPath = p.relative(featureFile.path, from: featuresDir.path);
     // Remove `.feature` extension and append `_test_runner.dart`
     final withoutExt = p.withoutExtension(relPath);
     final runnerRelPath = '${withoutExt}_test_runner.dart';

@@ -5,28 +5,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_gherkin_parser/utils/integration_test_helper.dart';
 
 void main() async {
-  final helper = IntegrationTestHelper(config);
+  final helper = IntegrationTestHelper(
+    config: config,
+    {{#features}}
+    {{#hasBackgroundSteps}}
+    backgroundSteps: _backgroundSteps,
+    {{/hasBackgroundSteps}}
+    {{/features}}
+    scenariosAndSteps: _scenariosAndSteps,
+  );
   {{#features}}
 
   group('Feature: {{name}}', () {
     {{#scenarios}}
     testWidgets('Scenario: {{name}}', (WidgetTester tester) async {
-      {{#hasBackgroundSteps}}
-      await helper.setUp(tester, stepNames: [
-        {{#backgroundSteps}}
-        '{{{text}}}',
-        {{/backgroundSteps}}
-      ]);
-      {{/hasBackgroundSteps}}
-      {{^hasBackgroundSteps}}
-      await helper.setUp(tester);
-      {{/hasBackgroundSteps}}
-
-      await helper.runStepsForScenario('{{name}}', [
-        {{#steps}}
-        '{{{text}}}',
-        {{/steps}}
-      ]);
+      await helper.setUp(tester, '{{name}}');
+      await helper.runStepsForScenario();
     });
     {{^isLast}}
 
@@ -35,3 +29,26 @@ void main() async {
   });
   {{/features}}
 }
+{{#features}}
+{{#hasBackgroundSteps}}
+
+final List<String> _backgroundSteps = <String>[
+  {{#backgroundSteps}}
+  r'''{{{jsonStep}}}''',
+  {{/backgroundSteps}}
+];
+
+{{/hasBackgroundSteps}}
+{{^hasBackgroundSteps}}
+
+{{/hasBackgroundSteps}}
+final Map<String, List<String>> _scenariosAndSteps = {
+{{#scenarios}}
+  '{{name}}': [
+    {{#steps}}
+    r'''{{{json}}}''',
+    {{/steps}}
+  ],
+{{/scenarios}}
+};
+{{/features}}

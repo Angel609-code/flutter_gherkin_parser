@@ -5,35 +5,39 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_gherkin_parser/utils/integration_test_helper.dart';
 
 void main() async {
-  final helper = IntegrationTestHelper(config);
+  final helper = IntegrationTestHelper(
+    config: config,
+    backgroundSteps: _backgroundSteps,
+    scenariosAndSteps: _scenariosAndSteps,
+  );
 
   group('Feature: Testing the fill text form field', () {
     testWidgets('Scenario: Filling input', (WidgetTester tester) async {
-      await helper.setUp(tester, stepNames: [
-        'Given I fill the "search" field with ""',
-        'And I should see "Este programa de comida es para ti"',
-        'And I print table "<<<{"header":["N","Nombre","estado"],"rows":[["1","John","0"],["2","Jean","1"]]}>>>"',
-        'And I click in input with key "deletePost"',
-      ]);
-
-      await helper.runStepsForScenario('Filling input', [
-        'And I fill the "search" field with "Tofu"',
-        'And I fill the "search" field with "Club"',
-      ]);
+      await helper.setUp(tester, 'Filling input');
+      await helper.runStepsForScenario();
     });
 
     testWidgets('Scenario: Checking a second scenario', (WidgetTester tester) async {
-      await helper.setUp(tester, stepNames: [
-        'Given I fill the "search" field with ""',
-        'And I should see "Este programa de comida es para ti"',
-        'And I print table "<<<{"header":["N","Nombre","estado"],"rows":[["1","John","0"],["2","Jean","1"]]}>>>"',
-        'And I click in input with key "deletePost"',
-      ]);
-
-      await helper.runStepsForScenario('Checking a second scenario', [
-        'And I fill the "search" field with ""',
-        'And I fill the "search" field with "Tofu"',
-      ]);
+      await helper.setUp(tester, 'Checking a second scenario');
+      await helper.runStepsForScenario();
     });
   });
 }
+
+final List<String> _backgroundSteps = <String>[
+  r'''{"text":"Given I fill the \"search\" field with \"\"","source":"/features/test.feature:4"}''',
+  r'''{"text":"And I should see \"Este programa de comida es para ti\"","source":"/features/test.feature:5"}''',
+  r'''{"text":"And I print table \"<<<{\"header\":[\"N\",\"Nombre\",\"estado\"],\"rows\":[[\"1\",\"John\",\"0\"],[\"2\",\"Jean\",\"1\"]]}>>>\"","source":"/features/test.feature:9"}''',
+  r'''{"text":"And I click in input with key \"floatingButton\"","source":"/features/test.feature:10"}''',
+];
+
+final Map<String, List<String>> _scenariosAndSteps = {
+  'Filling input': [
+    r'''{"text":"And I fill the \"search\" field with \"Tofu\"","source":"/features/test.feature:13"}''',
+    r'''{"text":"And I fill the \"search\" field with \"Club\"","source":"/features/test.feature:14"}''',
+  ],
+  'Checking a second scenario': [
+    r'''{"text":"And I fill the \"search\" field with \"\"","source":"/features/test.feature:17"}''',
+    r'''{"text":"And I fill the \"search\" field with \"Tofu\"","source":"/features/test.feature:18"}''',
+  ],
+};

@@ -5,60 +5,66 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_gherkin_parser/utils/integration_test_helper.dart';
 
 void main() async {
-  final helper = IntegrationTestHelper(config);
+  final helper = IntegrationTestHelper(
+    config: config,
+    scenariosAndSteps: _scenariosAndSteps,
+  );
 
   group('Feature: Testing regex‐driven step definitions', () {
     testWidgets('Scenario: Enter text with lookahead', (WidgetTester tester) async {
-      await helper.setUp(tester);
-
-      await helper.runStepsForScenario('Enter text with lookahead', [
-        'When I enter "searchTerm" into the search',
-      ]);
+      await helper.setUp(tester, 'Enter text with lookahead');
+      await helper.runStepsForScenario();
     });
 
     testWidgets('Scenario: Items in category', (WidgetTester tester) async {
-      await helper.setUp(tester);
-
-      await helper.runStepsForScenario('Items in category', [
-        'Given I have 5 items in category Books',
-        'And   I have 1 item in category Toys',
-      ]);
+      await helper.setUp(tester, 'Items in category');
+      await helper.runStepsForScenario();
     });
 
     testWidgets('Scenario: Print with optional height and age', (WidgetTester tester) async {
-      await helper.setUp(tester);
-
-      await helper.runStepsForScenario('Print with optional height and age', [
-        'Then I print Alice with height 170cm and age 30',
-        'And  I print Bob and age 25',
-      ]);
+      await helper.setUp(tester, 'Print with optional height and age');
+      await helper.runStepsForScenario();
     });
 
     testWidgets('Scenario: Match multiple groups', (WidgetTester tester) async {
-      await helper.setUp(tester);
-
-      await helper.runStepsForScenario('Match multiple groups', [
-        'When I do foo at position 42 end with code A1B2 and flag 0',
-        'And  I do bar at position 7 end with code FFFF and flag 1',
-      ]);
+      await helper.setUp(tester, 'Match multiple groups');
+      await helper.runStepsForScenario();
     });
 
     testWidgets('Scenario: Process multiline text', (WidgetTester tester) async {
-      await helper.setUp(tester);
-
-      await helper.runStepsForScenario('Process multiline text', [
-        'Then I see text: Hello world END section Main, number 10, flag 1, type urgent',
-        'And  I see text: Another block of text including spaces END section Sec1, number 5, flag 0, type normal',
-      ]);
+      await helper.setUp(tester, 'Process multiline text');
+      await helper.runStepsForScenario();
     });
 
     testWidgets('Scenario: Process six captures', (WidgetTester tester) async {
-      await helper.setUp(tester);
-
-      await helper.runStepsForScenario('Process six captures', [
-        'Given I process Task1 and foo at 250ms for code ABC1 with user "john" in group Admin',
-        'And   I process Report and bar at 100ms for code 1F2E with user "alice" in group Users',
-      ]);
+      await helper.setUp(tester, 'Process six captures');
+      await helper.runStepsForScenario();
     });
   });
 }
+
+final Map<String, List<String>> _scenariosAndSteps = {
+  'Enter text with lookahead': [
+    r'''{"text":"When I enter \"searchTerm\" into the search","source":"/features/test_regex_driven.feature:4"}''',
+  ],
+  'Items in category': [
+    r'''{"text":"Given I have 5 items in category Books","source":"/features/test_regex_driven.feature:7"}''',
+    r'''{"text":"And   I have 1 item in category Toys","source":"/features/test_regex_driven.feature:8"}''',
+  ],
+  'Print with optional height and age': [
+    r'''{"text":"Then I print Alice with height 170cm and age 30","source":"/features/test_regex_driven.feature:11"}''',
+    r'''{"text":"And  I print Bob and age 25","source":"/features/test_regex_driven.feature:12"}''',
+  ],
+  'Match multiple groups': [
+    r'''{"text":"When I do foo at position 42 end with code A1B2 and flag 0","source":"/features/test_regex_driven.feature:15"}''',
+    r'''{"text":"And  I do bar at position 7 end with code FFFF and flag 1","source":"/features/test_regex_driven.feature:16"}''',
+  ],
+  'Process multiline text': [
+    r'''{"text":"Then I see text: Hello world END section Main, number 10, flag 1, type urgent","source":"/features/test_regex_driven.feature:19"}''',
+    r'''{"text":"And  I see text: Another block of text including spaces END section Sec1, number 5, flag 0, type normal","source":"/features/test_regex_driven.feature:20"}''',
+  ],
+  'Process six captures': [
+    r'''{"text":"Given I process Task1 and foo at 250ms for code ABC1 with user \"john\" in group Admin","source":"/features/test_regex_driven.feature:23"}''',
+    r'''{"text":"And   I process Report and bar at 100ms for code 1F2E with user \"alice\" in group Users","source":"/features/test_regex_driven.feature:24"}''',
+  ],
+};

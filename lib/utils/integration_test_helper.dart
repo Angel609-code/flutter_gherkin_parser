@@ -1,3 +1,4 @@
+import 'dart:convert' show jsonDecode;
 import 'dart:io';
 import 'package:flutter/foundation.dart' show ErrorDescription, FlutterError, FlutterErrorDetails;
 import 'package:flutter_gherkin_parser/hooks/hook_manager.dart';
@@ -11,8 +12,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 class IntegrationTestHelper {
   final IntegrationTestConfig config;
+  final List<String> backgroundSteps;
+  final Map<String, List<String>> scenariosAndSteps;
+
   late final HookManager _hookManager;
   late final WidgetTesterWorld _world;
+
+  final String _scenarioNameKey = 'scenarioName';
 
   void init() {
     setUpAll(() async {
@@ -24,7 +30,11 @@ class IntegrationTestHelper {
     });
   }
 
-  IntegrationTestHelper(this.config) {
+  IntegrationTestHelper({
+    required this.config,
+    required this.scenariosAndSteps,
+    this.backgroundSteps = const <String>[]
+  }) {
     _hookManager = HookManager(config.hooks);
 
     _world = WidgetTesterWorld();
@@ -40,14 +50,18 @@ class IntegrationTestHelper {
 
   WidgetTesterWorld get world => _world;
 
-  Future<void> setUp(WidgetTester tester, {List<String> stepNames = const <String>[]}) async {
+  Future<void> setUp(WidgetTester tester, String scenarioName) async {
     await _world.setTester(tester);
+    _world.setAttachment(_scenarioNameKey, scenarioName);
+
     await config.appLauncher.call(_world.tester);
 
-    if (stepNames.isNotEmpty) {
+    final steps = _parseStepsFromJsonList(backgroundSteps);
+
+    if (steps.isNotEmpty) {
       await _performScenarioOrBackground(
         run: () async {
-          for (final step in stepNames) {
+          for (final step in steps) {
             await _executeStep(step, true);
           }
         },
@@ -56,12 +70,16 @@ class IntegrationTestHelper {
     }
   }
 
-  Future<void> runStepsForScenario(String scenarioName, List<String> stepNames) async {
+  Future<void> runStepsForScenario() async {
+    final String scenarioName = _world.getAttachment(_scenarioNameKey);
     await _hookManager.beforeScenario(scenarioName);
+
+    final stepsJson = scenariosAndSteps[scenarioName] ?? <String>[];
+    final steps = _parseStepsFromJsonList(stepsJson);
 
     await _performScenarioOrBackground(
       run: () async {
-        for (final step in stepNames) {
+        for (final step in steps) {
           await _executeStep(step, false);
         }
       },
@@ -89,13 +107,12 @@ class IntegrationTestHelper {
     }
   }
 
-  Future<void> _executeStep(String stepText, bool isBackground) async {
-    final Step step = Step(text: stepText);
+  Future<void> _executeStep(Step step, bool isBackground) async {
     await _hookManager.beforeStep(step.text, _world);
 
     final stepFunction = StepsRegistry.getStep(step.text);
     if (stepFunction != null) {
-      print('${isBackground ? orange : yellow}Executing ${isBackground ? 'background ' : ' '}step: ${step.text}$reset');
+      print('$green➔ [${step.source}] ${isBackground ? orange : yellow}Executing${isBackground ? ' background ' : ' '}step: ${step.text}$reset');
       await stepFunction(_world);
       await _hookManager.afterStep(step.text, _world);
     } else {
@@ -131,5 +148,12 @@ class IntegrationTestHelper {
     );
 
     exit(1); // Exit with error code to indicate test failure
+  }
+
+  List<Step> _parseStepsFromJsonList(List<String> jsonList) {
+    return jsonList.map((str) {
+      final Map<String, dynamic> m = jsonDecode(str);
+      return Step.fromJson(m);
+    }).toList();
   }
 }
