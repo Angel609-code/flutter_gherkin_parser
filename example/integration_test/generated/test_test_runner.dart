@@ -13,6 +13,7 @@ void main() async {
         'Given I fill the "search" field with ""',
         'And I should see "Este programa de comida es para ti"',
         'And I print table "<<<{"header":["N","Nombre","estado"],"rows":[["1","John","0"],["2","Jean","1"]]}>>>"',
+        'And I click in input with key "deletePost"',
       ]);
 
       await helper.runStepsForScenario('Filling input', [
@@ -26,6 +27,7 @@ void main() async {
         'Given I fill the "search" field with ""',
         'And I should see "Este programa de comida es para ti"',
         'And I print table "<<<{"header":["N","Nombre","estado"],"rows":[["1","John","0"],["2","Jean","1"]]}>>>"',
+        'And I click in input with key "deletePost"',
       ]);
 
       await helper.runStepsForScenario('Checking a second scenario', [

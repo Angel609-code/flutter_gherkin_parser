@@ -299,6 +299,7 @@ class _EmailHeadlineState extends State<EmailHeadline> {
                     height: 40,
                     width: 40,
                     child: FloatingActionButton(
+                      key: const Key('deletePost'),
                       onPressed: widget.onDelete,
                       elevation: 0,
                       backgroundColor: _colorScheme.surface,

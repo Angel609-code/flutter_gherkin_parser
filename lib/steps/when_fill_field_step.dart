@@ -25,8 +25,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// Returns a `StepDefinitionGeneric` that the runner can register.
 StepDefinitionGeneric whenFillFieldStep() {
   return generic2<String, String, WidgetTesterWorld>(
-    'I fill the {string} field with {string}',
-        (key, value, context) async {
+    'I fill the {string} field with {string}', (key, value, context) async {
       // Find the widget by its ValueKey.
       final finder = find.byKey(ValueKey(key));
 

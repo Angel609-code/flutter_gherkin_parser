@@ -1,3 +1,4 @@
+import 'package:flutter_gherkin_parser/utils/capture_token.dart';
 import 'package:flutter_gherkin_parser/utils/placeholders.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
 
@@ -31,430 +32,907 @@ StepDefinitionGeneric generic<T1,W>(
   return StepDefinitionGeneric(regex, 0, (args, context) => fn(context as W));
 }
 
-/// Creates a `StepDefinitionGeneric` for a pattern containing one placeholder.
+/// Defines a step with exactly one capture in [rawPattern]. That capture may be:
+///  • A placeholder `{string}`, `{table}`, etc.
+///  • A manual regex group `(text|input|dropdown)` (excluding `(?:…)`)
 ///
-/// The `pattern` string must include exactly one placeholder token in the form
-/// `{token}`, where `token` corresponds to a key in [placeholders]. This helper
-/// builds a single `RegExp` by replacing `{token}` with the associated `regexPart`.
-/// When the step is matched at runtime, the captured text is passed to the
-/// `parser` to produce a value of type `T1`. Finally, `fn` is invoked with that
-/// parsed value and the world context of type `W`.
-///
-/// If the pattern does not contain exactly one placeholder, or if the placeholder
-/// name is not registered in [placeholders], this function throws an `ArgumentError`.
+/// The single capture’s position in [rawPattern] determines the single argument
+/// passed to [fn]. Throws [ArgumentError] if the total count of placeholders +
+/// manual groups ≠ 1.
 ///
 /// Example:
 /// ```dart
-/// // To match: And I should see "Hello, world"
-/// final step = generic1<String, WidgetTesterWorld>(
+/// // One placeholder
+/// generic1<String, WidgetTesterWorld>(
 ///   'I should see {string}',
-///   (text, world) async {
-///     expect(find.text(text), findsOneWidget);
-///   },
+///   (text, world) async { /* … */ },
+/// );
+///
+/// // One manual group
+/// generic1<String, WidgetTesterWorld>(
+///   'I tap on (button|link)',
+///   (elemType, world) async { /* elemType is "button" or "link" */ },
 /// );
 /// ```
-///
-/// Type parameters:
-/// - `T1`: The type returned by the placeholder’s parser (e.g. `String` or `GherkinTable`).
-/// - `W`: The Gherkin world context (usually `WidgetTesterWorld`).
-StepDefinitionGeneric generic1<T1, W>(
-  String pattern,
-  Future<void> Function(T1, W) fn,
+StepDefinitionGeneric generic1<T, W>(
+  String rawPattern,
+  Future<void> Function(T value, W world) fn,
 ) {
-  final placeholderMatch = RegExp(r'\{(\w+)\}').firstMatch(pattern);
-  if (placeholderMatch == null) {
+  // Count placeholders in rawPattern
+  final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern).toList();
+  final placeholderCount = placeholderMatches.length;
+
+  // Count manual capture groups "(…)" in rawPattern, ignoring "(?:…)"
+  final manualPositions = <int>[];
+  final openParRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanForManual = 0;
+
+  while (true) {
+    final m = openParRegex.firstMatch(rawPattern.substring(scanForManual));
+
+    if (m == null) break;
+
+    final pos = scanForManual + m.start;
+    manualPositions.add(pos);
+    scanForManual = pos + 1;
+  }
+
+  final manualCount = manualPositions.length;
+
+  // Ensure exactly one total capture
+  if (placeholderCount + manualCount != 1) {
     throw ArgumentError(
-      'Pattern "$pattern" must contain exactly one placeholder, for example "{string}" or "{table}".',
+      'generic1 requires exactly one capture (placeholder or manual group). '
+          'Found $placeholderCount placeholder(s) and $manualCount manual group(s) in:\n'
+          '  $rawPattern',
     );
   }
 
-  final token = placeholderMatch.group(1)!;
-  final def = placeholders[token];
-  if (def == null) {
-    throw ArgumentError(
-      'Unsupported placeholder "{$token}". Expected one of: ${placeholders.keys.join(', ')}.',
-    );
-  }
+  // If there is one placeholder, replace it with its regex and record its def
+  final placeholderDefs = <PlaceholderDef>[];
+  var regexBody = rawPattern.replaceAllMapped(
+    RegExp(r'\{(\w+)\}'),  (match) {
+      final name = match.group(1)!;
+      final def = placeholders[name];
 
-  final regexPattern = '^${pattern.replaceAll('{$token}', def.regexPart)}\$';
-  final regex = RegExp(regexPattern);
+      if (def == null) {
+        throw ArgumentError(
+          'Unsupported placeholder "{$name}". Supported: ${placeholders.keys.join(", ")}.',
+        );
+      }
 
-  return StepDefinitionGeneric(regex, 1, (args, context) async {
-      final rawValue = args[0].toString().trim();
-      final parsed = def.parser(rawValue) as T1;
-      return fn(parsed, context as W);
+      placeholderDefs.add(def);
+      return def.regexPart;
     },
   );
+
+  // If there is one manual group, extract its inner pattern
+  final manualDefs = <String>[];
+  final manualGroupRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanIndex = 0;
+
+  while (true) {
+    final m = manualGroupRegex.firstMatch(regexBody.substring(scanIndex));
+
+    if (m == null) break;
+
+    final start = scanIndex + m.start;
+    var depth = 1;
+    var i = start + 1;
+
+    while (i < regexBody.length && depth > 0) {
+      if (regexBody[i] == '(') {
+        depth++;
+      } else if (regexBody[i] == ')') {
+        depth--;
+      }
+
+      i++;
+    }
+
+    final inner = regexBody.substring(start + 1, i - 1);
+    manualDefs.add(inner);
+    scanIndex = i;
+  }
+
+  // Determine which token appears (placeholder vs. manual) and record order
+  final ordered = <CaptureToken>[];
+  var pIndex = 0, mIndex = 0;
+  var idx = 0;
+
+  while (idx < rawPattern.length) {
+    final phMatch = RegExp(r'\{(\w+)\}').matchAsPrefix(rawPattern, idx);
+    final opMatch = RegExp(r'\(').matchAsPrefix(rawPattern, idx);
+
+    if (phMatch != null) {
+      ordered.add(CaptureToken.fromPlaceholder(placeholderDefs[pIndex++]));
+      idx += phMatch.group(0)!.length;
+    } else if (opMatch != null) {
+      if (rawPattern.substring(idx).startsWith('(?:')) {
+        idx += 3;
+      } else {
+        ordered.add(CaptureToken.fromManual(manualDefs[mIndex++]));
+        idx += 1;
+      }
+    } else {
+      idx++;
+    }
+  }
+
+  // Verify final regex has exactly one capture group
+  final totalLeftParens = RegExp(r'\(').allMatches(regexBody).length;
+  final nonCaptureParens = RegExp(r'\(\?:').allMatches(regexBody).length;
+  final groupCount = totalLeftParens - nonCaptureParens;
+
+  if (groupCount != 1 || ordered.length != 1) {
+    throw ArgumentError(
+      'generic1 expects exactly one capturing group after replacement. '
+          'Found $groupCount in regex:\n'
+          '  $regexBody',
+    );
+  }
+
+  // Build the anchored regex
+  final finalRegex = RegExp('^$regexBody\$');
+
+  return StepDefinitionGeneric(finalRegex, 1, (args, context) async {
+    final raw = args[0].toString().trim();
+    final token = ordered[0];
+    final parsedValue = (token.kind == CaptureKind.placeholder)
+        ? token.placeholderDef!.parser(raw)
+        : raw;
+
+    await fn(parsedValue as T, context as W);
+  });
 }
 
-/// Creates a `StepDefinitionGeneric` for a pattern containing two placeholders.
+/// Defines a step with exactly two captures in [rawPattern].
+/// Each capture may be either:
+///  • A placeholder (`{string}`, `{table}`, etc.)
+///  • A manual group (`(text|input|dropdown)`, excluding `(?:…)`)
 ///
-/// The `pattern` must include exactly two placeholder tokens (for example,
-/// `{string}` and `{table}`) in the order they appear in the step text. Each
-/// placeholder name must match one of the keys in [placeholders]. The returned
-/// `StepDefinitionGeneric` will:
-///  • Match the entire step text against a single `RegExp` that replaces each
-///    `{token}` with its `regexPart`.
-///  • Capture exactly two groups (argCount = 2).
-///  • Parse each captured group via the corresponding `parser` from [placeholders],
-///    producing values of types `T1` and `T2`.
-///  • Invoke `fn(parsed1, parsed2, world)` when the step is executed.
-///
-/// If `pattern` does not contain exactly two placeholders, or if any placeholder
-/// name is not registered, an `ArgumentError` is thrown.
-///
-/// Type parameters:
-///  • `T1`: The type returned by the first placeholder’s parser (for example, `String`).
-///  • `T2`: The type returned by the second placeholder’s parser (for example, `GherkinTable`).
-///  • `W`: The Gherkin world context (usually `WidgetTesterWorld`).
+/// The left-to-right order of these two captures in [rawPattern]
+/// determines the argument order passed to [fn]. Throws [ArgumentError]
+/// if the total number of placeholders + manual groups ≠ 2.
 ///
 /// Example:
 /// ```dart
-/// // Matches: And I fill the "search" field with "Tofu"
-/// final step = generic2<String, String, WidgetTesterWorld>(
-///   'I fill the {string} field with {string}',
-///   (fieldName, value, world) async {
-///     final finder = find.byKey(ValueKey(fieldName));
-///     expect(finder, findsOneWidget);
-///     await world.tester.enterText(finder, value);
-///     await world.tester.pumpAndSettle();
-///   },
+/// // One manual capture + one placeholder
+/// generic2<String, String, WidgetTesterWorld>(
+///   'I click in (text|input|dropdown) with key {string}',
+///   (type, key, world) async { /* … */ },
+/// );
+///
+/// // Two placeholders
+/// generic2<String, String, WidgetTesterWorld>(
+///   'I compare {string} with {string}',
+///   (first, second, world) async { /* … */ },
+/// );
+///
+/// // Two manual groups
+/// generic2<String, String, WidgetTesterWorld>(
+///   'I choose (mouse|keyboard) and (Linux|Windows)',
+///   (a, b, world) async { /* … */ },
 /// );
 /// ```
 StepDefinitionGeneric generic2<T1, T2, W>(
-  String pattern,
-  Future<void> Function(T1, T2, W) fn,
+  String rawPattern,
+  Future<void> Function(T1, T2, W world) fn,
 ) {
-  // Find all placeholder tokens in the pattern; expect exactly two.
-  final allMatches = RegExp(r'\{(\w+)\}').allMatches(pattern).toList();
-  if (allMatches.length != 2) {
+  // Count placeholders in rawPattern.
+  final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
+  final placeholderCount = placeholderMatches.length;
+
+  // Count manual capturing groups "(…)" in rawPattern, ignoring "(?:…)".
+  final manualMatches = <int>[];
+  final openParRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanIndexForManual = 0;
+
+  while (true) {
+    final m = openParRegex.firstMatch(rawPattern.substring(scanIndexForManual));
+    if (m == null) break;
+    final start = scanIndexForManual + m.start;
+    manualMatches.add(start);
+    scanIndexForManual = start + 1;
+  }
+
+  final manualCount = manualMatches.length;
+
+  // Validate there are exactly two total captures before doing any replacements.
+  if (placeholderCount + manualCount != 2) {
     throw ArgumentError(
-      'Pattern "$pattern" must contain exactly two placeholders, for example "{string}" and "{table}".',
+      'generic2 requires exactly two captures '
+          '(sum of placeholders and manual groups). '
+          'Found $placeholderCount placeholder(s) and $manualCount manual group(s) in pattern:\n'
+          '  $rawPattern',
     );
   }
 
-  // Look up each placeholder’s definition in order.
-  final defs = <PlaceholderDef>[];
-  final regexBody = pattern.replaceAllMapped(
-    RegExp(r'\{(\w+)\}'), (match) {
-      final token = match.group(1)!;
-      final def = placeholders[token];
-
-      if (def == null) {
+  // Replace each placeholder "{token}" with its regex fragment,
+  // collecting the associated PlaceholderDef objects in order.
+  final placeholderTokens = <PlaceholderDef>[];
+  var regexBody = rawPattern.replaceAllMapped(
+  RegExp(r'\{(\w+)\}'), (match) {
+      final tokenName = match.group(1)!;
+      final placeholderDef = placeholders[tokenName];
+      if (placeholderDef == null) {
         throw ArgumentError(
-          'Unsupported placeholder "{$token}". Expected one of: ${placeholders.keys.join(', ')}.',
+          'Unsupported placeholder "{$tokenName}". '
+              'Supported tokens: ${placeholders.keys.join(", ")}.',
         );
       }
 
-      defs.add(def);
-      return def.regexPart;
+      placeholderTokens.add(placeholderDef);
+      return placeholderDef.regexPart;
     },
   );
 
-  // Build a single RegExp that matches the entire step text.
-  final regex = RegExp('^$regexBody\$');
+  // Locate each manual capturing group "(…)" in regexBody (ignoring "(?:…)")
+  // and store its inner text in manualTokens. We scan one-by-one to match parentheses.
+  final manualTokens = <String>[];
+  final manualGroupRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanIndex = 0;
 
-  return StepDefinitionGeneric(regex, 2, (args, context) async {
-      final raw1 = args[0].toString().trim();
-      final raw2 = args[1].toString().trim();
+  while (true) {
+    final m = manualGroupRegex.firstMatch(regexBody.substring(scanIndex));
+    if (m == null) break;
+    final start = scanIndex + m.start;
 
-      final parsed1 = defs[0].parser(raw1) as T1;
-      final parsed2 = defs[1].parser(raw2) as T2;
+    // Find the matching closing parenthesis for this capturing group.
+    var depth = 1;
+    var i = start + 1;
+    while (i < regexBody.length && depth > 0) {
+      if (regexBody[i] == '(') {
+        depth++;
+      } else if (regexBody[i] == ')') {
+        depth--;
+      }
 
-      return fn(parsed1, parsed2, context as W);
-    },
-  );
+      i++;
+    }
+
+    // Extract the substring inside the parentheses (excluding "(" and ")").
+    final inner = regexBody.substring(start + 1, i - 1);
+    manualTokens.add(inner);
+    scanIndex = i;
+  }
+
+  // Determine the order in which placeholders and manual groups appear
+  // in the original rawPattern. We walk rawPattern left-to-right and
+  // push each encountered capture into orderedCaptures.
+  final orderedCaptures = <CaptureToken>[];
+  var placeholderIndex = 0;
+  var manualIndex = 0;
+  var idx = 0;
+
+  while (idx < rawPattern.length) {
+    final placeholderMatch = RegExp(r'\{(\w+)\}').matchAsPrefix(rawPattern, idx);
+    final openParMatch = RegExp(r'\(').matchAsPrefix(rawPattern, idx);
+
+    if (placeholderMatch != null) {
+      orderedCaptures.add(
+        CaptureToken.fromPlaceholder(placeholderTokens[placeholderIndex++]),
+      );
+      idx += placeholderMatch.group(0)!.length;
+    } else if (openParMatch != null) {
+      // If it starts with "(?:", skip those three characters.
+      if (rawPattern.substring(idx).startsWith('(?:')) {
+        idx += 3;
+      } else {
+        // This is a manual capturing group
+        orderedCaptures.add(
+          CaptureToken.fromManual(manualTokens[manualIndex++]),
+        );
+        idx += 1; // move past "("
+      }
+    } else {
+      idx++;
+    }
+  }
+
+  // After replacing placeholders, count total "(" in regexBody minus "(?:"
+  // to get the actual number of capture groups in the final regex.
+  final totalLeftParens = RegExp(r'\(').allMatches(regexBody).length;
+  final nonCaptureParens = RegExp(r'\(\?:').allMatches(regexBody).length;
+  final groupCount = totalLeftParens - nonCaptureParens;
+
+  // Double-check that the final regex has exactly two groups. If not, throw.
+  if (groupCount != 2 || orderedCaptures.length != 2) {
+    throw ArgumentError(
+      'generic2 expects exactly two capturing groups after placeholder replacement. '
+          'Found $groupCount groups in generated regex:\n'
+          '  $regexBody',
+    );
+  }
+
+  // Build the final anchored regex.
+  final finalRegex = RegExp('^$regexBody\$');
+
+  // Return a StepDefinitionGeneric that will extract exactly two arguments.
+  return StepDefinitionGeneric(finalRegex, 2, (args, context) async {
+    final parsed = <dynamic>[];
+
+    // For each capture in left-to-right order, apply the correct parser.
+    for (var i = 0; i < 2; i++) {
+      final rawText = args[i].toString().trim();
+      final token = orderedCaptures[i];
+
+      if (token.kind == CaptureKind.placeholder) {
+        // Use the placeholder’s parser (e.g. strip quotes, parse JSON).
+        parsed.add(token.placeholderDef!.parser(rawText));
+      } else {
+        // Manual capture: return the raw string directly.
+        parsed.add(rawText);
+      }
+    }
+
+    // Cast the two parsed values to T1 and T2, then invoke the callback.
+    final firstArg = parsed[0] as T1;
+    final secondArg = parsed[1] as T2;
+
+    await fn(firstArg, secondArg, context as W);
+  });
 }
 
-/// Creates a `StepDefinitionGeneric` for a pattern containing three placeholders.
+/// Defines a step that expects exactly three captures in [rawPattern].
+/// Each capture may be either:
+///  • A placeholder `{string}`, `{table}`, etc.
+///  • A manual regex group `(home|work|office)` (excluding `(?:…)`).
 ///
-/// The `pattern` must include exactly three placeholder tokens in the order
-/// they appear. Each token name must match a key in [placeholders]. This helper
-/// constructs a single `RegExp` by replacing each `{token}` with its
-/// `regexPart`. At runtime, it will:
-///  • Capture three groups (argCount = 3).
-///  • Parse each raw capture via the corresponding `parser`, resulting in
-///    values of types `T1`, `T2`, and `T3`.
-///  • Call `fn(parsed1, parsed2, parsed3, world)`.
+/// The order in which these three captures appear in [rawPattern]
+/// determines the argument order passed to [fn].
 ///
-/// Throws `ArgumentError` if the pattern does not contain exactly three
-/// placeholders or if any placeholder is not registered.
-///
-/// Type parameters:
-///  • `T1`, `T2`, `T3`: The types returned by the respective parsers.
-///  • `W`: The Gherkin world context.
-///
-/// Example:
-/// ```dart
-/// // Matches: And I perform "{action}" on "{target}" with "{value}"
-/// final step = generic3<String, String, String, WidgetTesterWorld>(
-///   'I perform "{string}" on "{string}" with "{string}"',
-///   (action, target, value, world) async {
-///     // Implementation here...
-///   },
-/// );
-/// ```
+/// If the combined number of placeholders and manual groups is not exactly three,
+/// this method throws an [ArgumentError] immediately.
 StepDefinitionGeneric generic3<T1, T2, T3, W>(
-  String pattern,
-  Future<void> Function(T1, T2, T3, W) fn,
+  String rawPattern,
+  Future<void> Function(T1, T2, T3, W world) fn,
 ) {
-  final allMatches = RegExp(r'\{(\w+)\}').allMatches(pattern).toList();
-  if (allMatches.length != 3) {
+  final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
+  final placeholderCount = placeholderMatches.length;
+
+  final manualPositions = <int>[];
+  final openParRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanForManual = 0;
+
+  while (true) {
+    final m = openParRegex.firstMatch(rawPattern.substring(scanForManual));
+
+    if (m == null) break;
+
+    final pos = scanForManual + m.start;
+    manualPositions.add(pos);
+    scanForManual = pos + 1;
+  }
+
+  final manualCount = manualPositions.length;
+
+  if (placeholderCount + manualCount != 3) {
     throw ArgumentError(
-      'Pattern "$pattern" must contain exactly three placeholders.',
+      'generic3 requires exactly three captures '
+          '(sum of placeholders and manual groups). '
+          'Found $placeholderCount placeholder(s) and $manualCount manual group(s) in:\n'
+          '  $rawPattern',
     );
   }
 
-  final defs = <PlaceholderDef>[];
-  final regexBody = pattern.replaceAllMapped(
-    RegExp(r'\{(\w+)\}'),  (match) {
-      final token = match.group(1)!;
-      final def = placeholders[token];
+  final placeholderDefs = <PlaceholderDef>[];
+  var regexBody = rawPattern.replaceAllMapped(
+    RegExp(r'\{(\w+)\}'), (match) {
+      final name = match.group(1)!;
+      final def = placeholders[name];
 
       if (def == null) {
         throw ArgumentError(
-          'Unsupported placeholder "{$token}". Expected one of: ${placeholders.keys.join(', ')}.',
+          'Unsupported placeholder "{$name}". Supported: ${placeholders.keys.join(", ")}.',
         );
       }
 
-      defs.add(def);
+      placeholderDefs.add(def);
       return def.regexPart;
     },
   );
 
-  final regex = RegExp('^$regexBody\$');
+  final manualDefs = <String>[];
+  final manualGroupRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanIndex = 0;
 
-  return StepDefinitionGeneric(regex, 3, (args, context) async {
-      final raw1 = args[0].toString().trim();
-      final raw2 = args[1].toString().trim();
-      final raw3 = args[2].toString().trim();
+  while (true) {
+    final m = manualGroupRegex.firstMatch(regexBody.substring(scanIndex));
+    if (m == null) break;
+    final start = scanIndex + m.start;
+    var depth = 1;
+    var i = start + 1;
 
-      final parsed1 = defs[0].parser(raw1) as T1;
-      final parsed2 = defs[1].parser(raw2) as T2;
-      final parsed3 = defs[2].parser(raw3) as T3;
+    while (i < regexBody.length && depth > 0) {
+      if (regexBody[i] == '(') {
+        depth++;
+      }
+      else if (regexBody[i] == ')') {
+        depth--;
+      }
 
-      return fn(parsed1, parsed2, parsed3, context as W);
-    },
-  );
+      i++;
+    }
+    final inner = regexBody.substring(start + 1, i - 1);
+    manualDefs.add(inner);
+    scanIndex = i;
+  }
+
+  final ordered = <CaptureToken>[];
+  var pIndex = 0, mIndex = 0;
+  var idx = 0;
+
+  while (idx < rawPattern.length) {
+    final ph = RegExp(r'\{(\w+)\}').matchAsPrefix(rawPattern, idx);
+    final op = RegExp(r'\(').matchAsPrefix(rawPattern, idx);
+
+    if (ph != null) {
+      ordered.add(CaptureToken.fromPlaceholder(placeholderDefs[pIndex++]));
+      idx += ph.group(0)!.length;
+    } else if (op != null) {
+      if (rawPattern.substring(idx).startsWith('(?:')) {
+        idx += 3;
+      } else {
+        ordered.add(CaptureToken.fromManual(manualDefs[mIndex++]));
+        idx += 1;
+      }
+    } else {
+      idx++;
+    }
+  }
+
+  final totalLeftParens = RegExp(r'\(').allMatches(regexBody).length;
+  final nonCaptureParens = RegExp(r'\(\?:').allMatches(regexBody).length;
+  final groupCount = totalLeftParens - nonCaptureParens;
+
+  if (groupCount != 3 || ordered.length != 3) {
+    throw ArgumentError(
+      'generic3 expects exactly three capturing groups after replacement. '
+          'Found $groupCount in regex:\n'
+          '  $regexBody',
+    );
+  }
+
+  final finalRegex = RegExp('^$regexBody\$');
+
+  return StepDefinitionGeneric(finalRegex, 3, (args, context) async {
+    final parsed = <dynamic>[];
+    for (var i = 0; i < 3; i++) {
+      final raw = args[i].toString().trim();
+      final token = ordered[i];
+
+      if (token.kind == CaptureKind.placeholder) {
+        parsed.add(token.placeholderDef!.parser(raw));
+      } else {
+        parsed.add(raw);
+      }
+    }
+
+    final a = parsed[0] as T1;
+    final b = parsed[1] as T2;
+    final c = parsed[2] as T3;
+
+    await fn(a, b, c, context as W);
+  });
 }
 
-/// Creates a `StepDefinitionGeneric` for a pattern containing four placeholders.
-///
-/// The `pattern` must contain exactly four `{token}` entries. Each token
-/// must correspond to a key in [placeholders]. This function builds one
-/// `RegExp` that matches the entire step, captures four groups, then parses
-/// each group, yielding values of types `T1`, `T2`, `T3`, and `T4`.
-/// Finally, it calls `fn(parsed1, parsed2, parsed3, parsed4, world)`.
-///
-/// Throws `ArgumentError` if the pattern does not have exactly four placeholders
-/// or if any token is unregistered.
-///
-/// Type parameters:
-///  • `T1`–`T4`: The types returned by each placeholder’s parser.
-///  • `W`: The Gherkin world context.
-///
-/// Example:
-/// ```dart
-/// // Matches: And I compute "{x}" plus "{y}" to get "{result}" in "{context}"
-/// final step = generic4<String, String, String, String, WidgetTesterWorld>(
-///   'I compute "{string}" plus "{string}" to get "{string}" in "{string}"',
-///   (x, y, result, ctx, world) async {
-///     // Implementation here...
-///   },
-/// );
-/// ```
+/// Defines a step that expects exactly four captures in [rawPattern].
+/// Each capture may be a placeholder or a manual regex group.
+/// Throws [ArgumentError] if the total count of captures is not four.
 StepDefinitionGeneric generic4<T1, T2, T3, T4, W>(
-  String pattern,
-  Future<void> Function(T1, T2, T3, T4, W) fn,
+  String rawPattern,
+  Future<void> Function(T1, T2, T3, T4, W world) fn,
 ) {
-  final allMatches = RegExp(r'\{(\w+)\}').allMatches(pattern).toList();
-  if (allMatches.length != 4) {
+  final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
+  final placeholderCount = placeholderMatches.length;
+
+  final manualPositions = <int>[];
+  final openParRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanForManual = 0;
+
+  while (true) {
+    final m = openParRegex.firstMatch(rawPattern.substring(scanForManual));
+
+    if (m == null) break;
+
+    final pos = scanForManual + m.start;
+    manualPositions.add(pos);
+    scanForManual = pos + 1;
+  }
+
+  final manualCount = manualPositions.length;
+
+  if (placeholderCount + manualCount != 4) {
     throw ArgumentError(
-      'Pattern "$pattern" must contain exactly four placeholders.',
+      'generic4 requires exactly four captures. '
+          'Found $placeholderCount placeholder(s) and $manualCount manual group(s) in:\n'
+          '  $rawPattern',
     );
   }
 
-  final defs = <PlaceholderDef>[];
-  final regexBody = pattern.replaceAllMapped(
+  final placeholderDefs = <PlaceholderDef>[];
+  var regexBody = rawPattern.replaceAllMapped(
     RegExp(r'\{(\w+)\}'), (match) {
-      final token = match.group(1)!;
-      final def = placeholders[token];
+      final name = match.group(1)!;
+      final def = placeholders[name];
 
       if (def == null) {
         throw ArgumentError(
-          'Unsupported placeholder "{$token}". Expected one of: ${placeholders.keys.join(', ')}.',
+          'Unsupported placeholder "{$name}". Supported: ${placeholders.keys.join(", ")}.',
         );
       }
 
-      defs.add(def);
+      placeholderDefs.add(def);
       return def.regexPart;
     },
   );
 
-  final regex = RegExp('^$regexBody\$');
+  final manualDefs = <String>[];
+  final manualGroupRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanIndex = 0;
 
-  return StepDefinitionGeneric(regex, 4, (args, context) async {
-      final raw1 = args[0].toString().trim();
-      final raw2 = args[1].toString().trim();
-      final raw3 = args[2].toString().trim();
-      final raw4 = args[3].toString().trim();
+  while (true) {
+    final m = manualGroupRegex.firstMatch(regexBody.substring(scanIndex));
 
-      final parsed1 = defs[0].parser(raw1) as T1;
-      final parsed2 = defs[1].parser(raw2) as T2;
-      final parsed3 = defs[2].parser(raw3) as T3;
-      final parsed4 = defs[3].parser(raw4) as T4;
+    if (m == null) break;
 
-      return fn(parsed1, parsed2, parsed3, parsed4, context as W);
-    },
-  );
+    final start = scanIndex + m.start;
+    var depth = 1;
+    var i = start + 1;
+
+    while (i < regexBody.length && depth > 0) {
+      if (regexBody[i] == '(') {
+        depth++;
+      }
+      else if (regexBody[i] == ')') {
+        depth--;
+      }
+
+      i++;
+    }
+
+    final inner = regexBody.substring(start + 1, i - 1);
+    manualDefs.add(inner);
+    scanIndex = i;
+  }
+
+  final ordered = <CaptureToken>[];
+  var pIndex = 0, mIndex = 0;
+  var idx = 0;
+
+  while (idx < rawPattern.length) {
+    final ph = RegExp(r'\{(\w+)\}').matchAsPrefix(rawPattern, idx);
+    final op = RegExp(r'\(').matchAsPrefix(rawPattern, idx);
+
+    if (ph != null) {
+      ordered.add(CaptureToken.fromPlaceholder(placeholderDefs[pIndex++]));
+      idx += ph.group(0)!.length;
+    } else if (op != null) {
+      if (rawPattern.substring(idx).startsWith('(?:')) {
+        idx += 3;
+      } else {
+        ordered.add(CaptureToken.fromManual(manualDefs[mIndex++]));
+        idx += 1;
+      }
+    } else {
+      idx++;
+    }
+  }
+
+  final totalLeftParens = RegExp(r'\(').allMatches(regexBody).length;
+  final nonCaptureParens = RegExp(r'\(\?:').allMatches(regexBody).length;
+  final groupCount = totalLeftParens - nonCaptureParens;
+
+  if (groupCount != 4 || ordered.length != 4) {
+    throw ArgumentError(
+      'generic4 expects exactly four capturing groups after replacement. '
+          'Found $groupCount in regex:\n'
+          '  $regexBody',
+    );
+  }
+
+  final finalRegex = RegExp('^$regexBody\$');
+
+  return StepDefinitionGeneric(finalRegex, 4, (args, context) async {
+    final parsed = <dynamic>[];
+    for (var i = 0; i < 4; i++) {
+      final raw = args[i].toString().trim();
+      final token = ordered[i];
+
+      if (token.kind == CaptureKind.placeholder) {
+        parsed.add(token.placeholderDef!.parser(raw));
+      } else {
+        parsed.add(raw);
+      }
+    }
+
+    final a = parsed[0] as T1;
+    final b = parsed[1] as T2;
+    final c = parsed[2] as T3;
+    final d = parsed[3] as T4;
+
+    await fn(a, b, c, d, context as W);
+  });
 }
 
-/// Creates a `StepDefinitionGeneric` for a pattern containing five placeholders.
-///
-/// The `pattern` must include exactly five `{token}` entries. Each token name
-/// must be a key in [placeholders]. This helper:
-///  • Builds one `RegExp` by replacing each `{token}` with its `regexPart`.
-///  • Captures five groups at runtime (argCount = 5).
-///  • Parses each captured string, producing five values of types `T1`–`T5`.
-///  • Calls `fn(parsed1, parsed2, parsed3, parsed4, parsed5, world)`.
-///
-/// An `ArgumentError` is thrown if the pattern does not contain exactly five
-/// placeholders or if any token is not registered.
-///
-/// Type parameters:
-///  • `T1`–`T5`: The types returned by each parser in order.
-///  • `W`: The Gherkin world context.
-///
-/// Example:
-/// ```dart
-/// // Matches: And I set "{key}" to "{value}" in "{section}" with "{mode}" and "{flag}"
-/// final step = generic5<
-///     String, String, String, String, String, WidgetTesterWorld>(
-///   'I set "{string}" to "{string}" in "{string}" with "{string}" and "{string}"',
-///   (key, value, section, mode, flag, world) async {
-///     // Implementation here...
-///   },
-/// );
-/// ```
+/// Defines a step that expects exactly five captures (placeholders or manual).
+/// Throws [ArgumentError] if the total count is not five.
 StepDefinitionGeneric generic5<T1, T2, T3, T4, T5, W>(
-  String pattern,
-  Future<void> Function(T1, T2, T3, T4, T5, W) fn,
+  String rawPattern,
+  Future<void> Function(T1, T2, T3, T4, T5, W world) fn,
 ) {
-  final allMatches = RegExp(r'\{(\w+)\}').allMatches(pattern).toList();
-  if (allMatches.length != 5) {
+  final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
+  final placeholderCount = placeholderMatches.length;
+
+  final manualPositions = <int>[];
+  final openParRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanForManual = 0;
+
+  while (true) {
+    final m = openParRegex.firstMatch(rawPattern.substring(scanForManual));
+
+    if (m == null) break;
+
+    final pos = scanForManual + m.start;
+    manualPositions.add(pos);
+    scanForManual = pos + 1;
+  }
+
+  final manualCount = manualPositions.length;
+
+  if (placeholderCount + manualCount != 5) {
     throw ArgumentError(
-      'Pattern "$pattern" must contain exactly five placeholders.',
+      'generic5 requires exactly five captures. '
+          'Found $placeholderCount placeholder(s) and $manualCount manual group(s) in:\n'
+          '  $rawPattern',
     );
   }
 
-  final defs = <PlaceholderDef>[];
-  final regexBody = pattern.replaceAllMapped(
+  final placeholderDefs = <PlaceholderDef>[];
+  var regexBody = rawPattern.replaceAllMapped(
     RegExp(r'\{(\w+)\}'), (match) {
-      final token = match.group(1)!;
-      final def = placeholders[token];
+      final name = match.group(1)!;
+      final def = placeholders[name];
+
       if (def == null) {
         throw ArgumentError(
-          'Unsupported placeholder "{$token}". Expected one of: ${placeholders.keys.join(', ')}.',
+          'Unsupported placeholder "{$name}". Supported: ${placeholders.keys.join(", ")}.',
         );
       }
-      defs.add(def);
+
+      placeholderDefs.add(def);
       return def.regexPart;
     },
   );
 
-  final regex = RegExp('^$regexBody\$');
+  final manualDefs = <String>[];
+  final manualGroupRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanIndex = 0;
 
-  return StepDefinitionGeneric(regex, 5, (args, context) async {
-      final raw1 = args[0].toString().trim();
-      final raw2 = args[1].toString().trim();
-      final raw3 = args[2].toString().trim();
-      final raw4 = args[3].toString().trim();
-      final raw5 = args[4].toString().trim();
+  while (true) {
+    final m = manualGroupRegex.firstMatch(regexBody.substring(scanIndex));
 
-      final parsed1 = defs[0].parser(raw1) as T1;
-      final parsed2 = defs[1].parser(raw2) as T2;
-      final parsed3 = defs[2].parser(raw3) as T3;
-      final parsed4 = defs[3].parser(raw4) as T4;
-      final parsed5 = defs[4].parser(raw5) as T5;
+    if (m == null) break;
 
-      return fn(parsed1, parsed2, parsed3, parsed4, parsed5, context as W);
-    },
-  );
+    final start = scanIndex + m.start;
+    var depth = 1;
+    var i = start + 1;
+
+    while (i < regexBody.length && depth > 0) {
+      if (regexBody[i] == '(') {
+        depth++;
+      }
+      else if (regexBody[i] == ')') {
+        depth--;
+      }
+
+      i++;
+    }
+
+    final inner = regexBody.substring(start + 1, i - 1);
+    manualDefs.add(inner);
+    scanIndex = i;
+  }
+
+  final ordered = <CaptureToken>[];
+  var pIndex = 0, mIndex = 0;
+  var idx = 0;
+
+  while (idx < rawPattern.length) {
+    final ph = RegExp(r'\{(\w+)\}').matchAsPrefix(rawPattern, idx);
+    final op = RegExp(r'\(').matchAsPrefix(rawPattern, idx);
+
+    if (ph != null) {
+      ordered.add(CaptureToken.fromPlaceholder(placeholderDefs[pIndex++]));
+      idx += ph.group(0)!.length;
+    } else if (op != null) {
+      if (rawPattern.substring(idx).startsWith('(?:')) {
+        idx += 3;
+      } else {
+        ordered.add(CaptureToken.fromManual(manualDefs[mIndex++]));
+        idx += 1;
+      }
+    } else {
+      idx++;
+    }
+  }
+
+  final totalLeftParens = RegExp(r'\(').allMatches(regexBody).length;
+  final nonCaptureParens = RegExp(r'\(\?:').allMatches(regexBody).length;
+  final groupCount = totalLeftParens - nonCaptureParens;
+
+  if (groupCount != 5 || ordered.length != 5) {
+    throw ArgumentError(
+      'generic5 expects exactly five capturing groups after replacement. '
+          'Found $groupCount in regex:\n'
+          '  $regexBody',
+    );
+  }
+
+  final finalRegex = RegExp('^$regexBody\$');
+
+  return StepDefinitionGeneric(finalRegex, 5, (args, context) async {
+    final parsed = <dynamic>[];
+
+    for (var i = 0; i < 5; i++) {
+      final raw = args[i].toString().trim();
+      final token = ordered[i];
+
+      if (token.kind == CaptureKind.placeholder) {
+        parsed.add(token.placeholderDef!.parser(raw));
+      } else {
+        parsed.add(raw);
+      }
+    }
+
+    final a = parsed[0] as T1;
+    final b = parsed[1] as T2;
+    final c = parsed[2] as T3;
+    final d = parsed[3] as T4;
+    final e = parsed[4] as T5;
+
+    await fn(a, b, c, d, e, context as W);
+  });
 }
 
-/// Creates a `StepDefinitionGeneric` for a pattern containing six placeholders.
-///
-/// The `pattern` must include exactly six `{token}` entries. Each placeholder
-/// name must match a key in [placeholders]. This function:
-///  • Replaces each `{token}` with its `regexPart` to form a single `RegExp`.
-///  • Captures six groups at runtime (argCount = 6).
-///  • Parses each captured string into types `T1`–`T6`.
-///  • Invokes `fn(parsed1, parsed2, parsed3, parsed4, parsed5, parsed6, world)`.
-///
-/// An `ArgumentError` is thrown if the pattern does not have exactly six
-/// placeholders or if any token is not registered in [placeholders].
-///
-/// Type parameters:
-///  • `T1`–`T6`: The types returned by each parser, in order.
-///  • `W`: The Gherkin world context.
-///
-/// Example:
-/// ```dart
-/// // Matches: And I verify "{a}" "{b}" "{c}" "{d}" "{e}" "{f}"
-/// final step = generic6<
-///     String, String, String, String, String, String, WidgetTesterWorld>(
-///   'I verify "{string}" "{string}" "{string}" "{string}" "{string}" "{string}"',
-///   (a, b, c, d, e, f, world) async {
-///     // Implementation here...
-///   },
-/// );
-/// ```
+/// Defines a step that expects exactly six captures (placeholders or manual).
+/// Throws [ArgumentError] if the total count is not six.
 StepDefinitionGeneric generic6<T1, T2, T3, T4, T5, T6, W>(
-  String pattern,
-  Future<void> Function(T1, T2, T3, T4, T5, T6, W) fn,
+  String rawPattern,
+  Future<void> Function(T1, T2, T3, T4, T5, T6, W world) fn,
 ) {
-  final allMatches = RegExp(r'\{(\w+)\}').allMatches(pattern).toList();
-  if (allMatches.length != 6) {
+  final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
+  final placeholderCount = placeholderMatches.length;
+
+  final manualPositions = <int>[];
+  final openParRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanForManual = 0;
+
+  while (true) {
+    final m = openParRegex.firstMatch(rawPattern.substring(scanForManual));
+
+    if (m == null) break;
+
+    final pos = scanForManual + m.start;
+    manualPositions.add(pos);
+    scanForManual = pos + 1;
+  }
+
+  final manualCount = manualPositions.length;
+
+  if (placeholderCount + manualCount != 6) {
     throw ArgumentError(
-      'Pattern "$pattern" must contain exactly six placeholders.',
+      'generic6 requires exactly six captures. '
+          'Found $placeholderCount placeholder(s) and $manualCount manual group(s) in:\n'
+          '  $rawPattern',
     );
   }
 
-  final defs = <PlaceholderDef>[];
-  final regexBody = pattern.replaceAllMapped(
+  final placeholderDefs = <PlaceholderDef>[];
+  var regexBody = rawPattern.replaceAllMapped(
     RegExp(r'\{(\w+)\}'), (match) {
-      final token = match.group(1)!;
-      final def = placeholders[token];
+      final name = match.group(1)!;
+      final def = placeholders[name];
 
       if (def == null) {
         throw ArgumentError(
-          'Unsupported placeholder "{$token}". Expected one of: ${placeholders.keys.join(', ')}.',
+          'Unsupported placeholder "{$name}". Supported: ${placeholders.keys.join(", ")}.',
         );
       }
 
-      defs.add(def);
+      placeholderDefs.add(def);
       return def.regexPart;
     },
   );
 
-  final regex = RegExp('^$regexBody\$');
+  final manualDefs = <String>[];
+  final manualGroupRegex = RegExp(r'(?<!\?)\((?!\?)');
+  var scanIndex = 0;
 
-  return StepDefinitionGeneric(regex, 6, (args, context) async {
-      final raw1 = args[0].toString().trim();
-      final raw2 = args[1].toString().trim();
-      final raw3 = args[2].toString().trim();
-      final raw4 = args[3].toString().trim();
-      final raw5 = args[4].toString().trim();
-      final raw6 = args[5].toString().trim();
+  while (true) {
+    final m = manualGroupRegex.firstMatch(regexBody.substring(scanIndex));
 
-      final parsed1 = defs[0].parser(raw1) as T1;
-      final parsed2 = defs[1].parser(raw2) as T2;
-      final parsed3 = defs[2].parser(raw3) as T3;
-      final parsed4 = defs[3].parser(raw4) as T4;
-      final parsed5 = defs[4].parser(raw5) as T5;
-      final parsed6 = defs[5].parser(raw6) as T6;
+    if (m == null) break;
 
-      return fn(parsed1, parsed2, parsed3, parsed4, parsed5, parsed6, context as W);
-    },
-  );
+    final start = scanIndex + m.start;
+    var depth = 1;
+    var i = start + 1;
+
+    while (i < regexBody.length && depth > 0) {
+      if (regexBody[i] == '(') {
+        depth++;
+      }
+      else if (regexBody[i] == ')') {
+        depth--;
+      }
+
+      i++;
+    }
+
+    final inner = regexBody.substring(start + 1, i - 1);
+    manualDefs.add(inner);
+    scanIndex = i;
+  }
+
+  final ordered = <CaptureToken>[];
+  var pIndex = 0, mIndex = 0;
+  var idx = 0;
+
+  while (idx < rawPattern.length) {
+    final ph = RegExp(r'\{(\w+)\}').matchAsPrefix(rawPattern, idx);
+    final op = RegExp(r'\(').matchAsPrefix(rawPattern, idx);
+
+    if (ph != null) {
+      ordered.add(CaptureToken.fromPlaceholder(placeholderDefs[pIndex++]));
+      idx += ph.group(0)!.length;
+    } else if (op != null) {
+      if (rawPattern.substring(idx).startsWith('(?:')) {
+        idx += 3;
+      } else {
+        ordered.add(CaptureToken.fromManual(manualDefs[mIndex++]));
+        idx += 1;
+      }
+    } else {
+      idx++;
+    }
+  }
+
+  final totalLeftParens = RegExp(r'\(').allMatches(regexBody).length;
+  final nonCaptureParens = RegExp(r'\(\?:').allMatches(regexBody).length;
+  final groupCount = totalLeftParens - nonCaptureParens;
+
+  if (groupCount != 6 || ordered.length != 6) {
+    throw ArgumentError(
+      'generic6 expects exactly six capturing groups after replacement. '
+          'Found $groupCount in regex:\n'
+          '  $regexBody',
+    );
+  }
+
+  final finalRegex = RegExp('^$regexBody\$');
+
+  return StepDefinitionGeneric(finalRegex, 6, (args, context) async {
+    final parsed = <dynamic>[];
+
+    for (var i = 0; i < 6; i++) {
+      final raw = args[i].toString().trim();
+      final token = ordered[i];
+
+      if (token.kind == CaptureKind.placeholder) {
+        parsed.add(token.placeholderDef!.parser(raw));
+      } else {
+        parsed.add(raw);
+      }
+    }
+
+    final a = parsed[0] as T1;
+    final b = parsed[1] as T2;
+    final c = parsed[2] as T3;
+    final d = parsed[3] as T4;
+    final e = parsed[4] as T5;
+    final f = parsed[5] as T6;
+
+    await fn(a, b, c, d, e, f, context as W);
+  });
 }
