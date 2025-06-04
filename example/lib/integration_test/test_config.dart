@@ -1,4 +1,5 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'package:example/integration_test/steps/and_print_non_grouping_value_step.dart';
 import 'package:example/integration_test/steps/and_print_table_step.dart';
 import 'package:example/integration_test/steps/when_click_in_step.dart';
 import 'package:example/main.dart';
@@ -30,5 +31,7 @@ final config = IntegrationTestConfig(
     thenReadTextStep(),
     andPrintTable(),
     whenClickWidgetStep(),
+    andPrintNonGroupingValue(),
+    andPrintNonGroupingValue3(),
   ]
 );

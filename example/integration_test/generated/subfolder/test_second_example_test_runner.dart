@@ -7,12 +7,15 @@ import 'package:flutter_gherkin_parser/utils/integration_test_helper.dart';
 void main() async {
   final helper = IntegrationTestHelper(config);
 
-  group('Feature: Testing the fill text form field', () {
+  group('Feature: Testing the fill text form field 2', () {
     testWidgets('Scenario: Second example of escenario', (WidgetTester tester) async {
       await helper.setUp(tester);
 
       await helper.runStepsForScenario('Second example of escenario', [
         'And I fill the "search" field with "Tofu"',
+        'And I check non-grouping',
+        'And I check non-grouping with this as param',
+        'Then I print "hello" or maybe this non-grouping with this as param or this two',
       ]);
     });
   });

@@ -25,9 +25,9 @@ class StepDefinitionGeneric {
 }
 
 StepDefinitionGeneric generic<T1,W>(
-    String pattern,
-    Future<void> Function(W) fn,
-    ) {
+  String pattern,
+  Future<void> Function(W) fn,
+) {
   final regex = RegExp('^${pattern.replaceAll('{string}', '"(.*?)"')}' r'$');
   return StepDefinitionGeneric(regex, 0, (args, context) => fn(context as W));
 }
@@ -58,6 +58,13 @@ StepDefinitionGeneric generic1<T, W>(
   String rawPattern,
   Future<void> Function(T value, W world) fn,
 ) {
+  // Rewrite any optional non-capturing group "(?: …)?"
+  //    into "(…)?", so it becomes a single capturing group.
+  rawPattern = rawPattern.replaceAllMapped(
+    // Capture exactly the leading space plus everything until ")"
+    RegExp(r'\(\?:(\s[^)]+?)\)\?'), (m) => '(${m.group(1)})?',
+  );
+
   // Count placeholders in rawPattern
   final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern).toList();
   final placeholderCount = placeholderMatches.length;
@@ -176,7 +183,7 @@ StepDefinitionGeneric generic1<T, W>(
   final finalRegex = RegExp('^$regexBody\$');
 
   return StepDefinitionGeneric(finalRegex, 1, (args, context) async {
-    final raw = args[0].toString().trim();
+    final raw = args[0];
     final token = ordered[0];
     final parsedValue = (token.kind == CaptureKind.placeholder)
         ? token.placeholderDef!.parser(raw)
@@ -219,6 +226,13 @@ StepDefinitionGeneric generic2<T1, T2, W>(
   String rawPattern,
   Future<void> Function(T1, T2, W world) fn,
 ) {
+  // Rewrite any optional non-capturing group "(?: …)?"
+  //    into "(…)?", so it becomes a single capturing group.
+  rawPattern = rawPattern.replaceAllMapped(
+    // Capture exactly the leading space plus everything until ")"
+    RegExp(r'\(\?:(\s[^)]+?)\)\?'), (m) => '(${m.group(1)})?',
+  );
+
   // Count placeholders in rawPattern.
   final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
   final placeholderCount = placeholderMatches.length;
@@ -354,7 +368,7 @@ StepDefinitionGeneric generic2<T1, T2, W>(
 
     // For each capture in left-to-right order, apply the correct parser.
     for (var i = 0; i < 2; i++) {
-      final rawText = args[i].toString().trim();
+      final rawText = args[i].toString();
       final token = orderedCaptures[i];
 
       if (token.kind == CaptureKind.placeholder) {
@@ -388,6 +402,13 @@ StepDefinitionGeneric generic3<T1, T2, T3, W>(
   String rawPattern,
   Future<void> Function(T1, T2, T3, W world) fn,
 ) {
+  // Rewrite any optional non-capturing group "(?: …)?"
+  //    into "(…)?", so it becomes a single capturing group.
+  rawPattern = rawPattern.replaceAllMapped(
+    // Capture exactly the leading space plus everything until ")"
+    RegExp(r'\(\?:(\s[^)]+?)\)\?'), (m) => '(${m.group(1)})?',
+  );
+
   final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
   final placeholderCount = placeholderMatches.length;
 
@@ -499,7 +520,7 @@ StepDefinitionGeneric generic3<T1, T2, T3, W>(
   return StepDefinitionGeneric(finalRegex, 3, (args, context) async {
     final parsed = <dynamic>[];
     for (var i = 0; i < 3; i++) {
-      final raw = args[i].toString().trim();
+      final raw = args[i].toString();
       final token = ordered[i];
 
       if (token.kind == CaptureKind.placeholder) {
@@ -524,6 +545,13 @@ StepDefinitionGeneric generic4<T1, T2, T3, T4, W>(
   String rawPattern,
   Future<void> Function(T1, T2, T3, T4, W world) fn,
 ) {
+  // Rewrite any optional non-capturing group "(?: …)?"
+  //    into "(…)?", so it becomes a single capturing group.
+  rawPattern = rawPattern.replaceAllMapped(
+    // Capture exactly the leading space plus everything until ")"
+    RegExp(r'\(\?:(\s[^)]+?)\)\?'), (m) => '(${m.group(1)})?',
+  );
+
   final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
   final placeholderCount = placeholderMatches.length;
 
@@ -637,7 +665,7 @@ StepDefinitionGeneric generic4<T1, T2, T3, T4, W>(
   return StepDefinitionGeneric(finalRegex, 4, (args, context) async {
     final parsed = <dynamic>[];
     for (var i = 0; i < 4; i++) {
-      final raw = args[i].toString().trim();
+      final raw = args[i].toString();
       final token = ordered[i];
 
       if (token.kind == CaptureKind.placeholder) {
@@ -662,6 +690,13 @@ StepDefinitionGeneric generic5<T1, T2, T3, T4, T5, W>(
   String rawPattern,
   Future<void> Function(T1, T2, T3, T4, T5, W world) fn,
 ) {
+  // Rewrite any optional non-capturing group "(?: …)?"
+  //    into "(…)?", so it becomes a single capturing group.
+  rawPattern = rawPattern.replaceAllMapped(
+    // Capture exactly the leading space plus everything until ")"
+    RegExp(r'\(\?:(\s[^)]+?)\)\?'), (m) => '(${m.group(1)})?',
+  );
+
   final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
   final placeholderCount = placeholderMatches.length;
 
@@ -776,7 +811,7 @@ StepDefinitionGeneric generic5<T1, T2, T3, T4, T5, W>(
     final parsed = <dynamic>[];
 
     for (var i = 0; i < 5; i++) {
-      final raw = args[i].toString().trim();
+      final raw = args[i].toString();
       final token = ordered[i];
 
       if (token.kind == CaptureKind.placeholder) {
@@ -802,6 +837,13 @@ StepDefinitionGeneric generic6<T1, T2, T3, T4, T5, T6, W>(
   String rawPattern,
   Future<void> Function(T1, T2, T3, T4, T5, T6, W world) fn,
 ) {
+  // Rewrite any optional non-capturing group "(?: …)?"
+  //    into "(…)?", so it becomes a single capturing group.
+  rawPattern = rawPattern.replaceAllMapped(
+    // Capture exactly the leading space plus everything until ")"
+    RegExp(r'\(\?:(\s[^)]+?)\)\?'), (m) => '(${m.group(1)})?',
+  );
+
   final placeholderMatches = RegExp(r'\{(\w+)\}').allMatches(rawPattern);
   final placeholderCount = placeholderMatches.length;
 
@@ -916,7 +958,7 @@ StepDefinitionGeneric generic6<T1, T2, T3, T4, T5, T6, W>(
     final parsed = <dynamic>[];
 
     for (var i = 0; i < 6; i++) {
-      final raw = args[i].toString().trim();
+      final raw = args[i].toString();
       final token = ordered[i];
 
       if (token.kind == CaptureKind.placeholder) {
