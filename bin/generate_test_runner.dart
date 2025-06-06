@@ -1,5 +1,3 @@
-// bin/generate_test_runner.dart
-
 import 'dart:io';
 import 'dart:isolate';
 import 'package:mustache_template/mustache_template.dart';
@@ -10,9 +8,6 @@ import 'package:flutter_gherkin_parser/utils/feature_parser.dart';
 ///
 /// Usage:
 ///   dart run flutter_gherkin_parser:generate_test_runner [--config PATH]
-///
-/// If `--config PATH` is provided, the generated runners will import that
-/// config file. Otherwise, they import the library’s default config.
 Future<void> main(List<String> args) async {
   // Determine if the user provided a custom config path
   final rawConfigArgIndex = args.indexOf('--config');

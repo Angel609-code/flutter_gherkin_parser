@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show ErrorDescription, FlutterError, Fl
 import 'package:flutter_gherkin_parser/hooks/hook_manager.dart';
 import 'package:flutter_gherkin_parser/integration_test_config.dart';
 import 'package:flutter_gherkin_parser/models/step_model.dart';
+import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/steps/steps_registry.dart';
 import 'package:flutter_gherkin_parser/utils/terminal_colors.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
@@ -127,14 +128,33 @@ class IntegrationTestHelper {
     await _hookManager.beforeStep(step.text, _world);
 
     final stepFunction = StepsRegistry.getStep(step.text);
+
+    StepResult result;
     if (stepFunction != null) {
-      print('$green➔ [${step.source}] ${isBackground ? orange : yellow}Executing${isBackground ? ' background ' : ' '}step: ${step.text}$reset');
-      await stepFunction(_world);
-      await _hookManager.afterStep(step.text, _world);
+      try {
+        print('$green➔ [${step.source}] ${isBackground ? orange : yellow}Executing${isBackground ? ' background ' : ' '}step: ${step.text}$reset');
+        await stepFunction(_world);
+        result = StepSuccess(step.text);
+        await _hookManager.afterStep(result, _world);
+      } catch (e) {
+        result = StepFailure(
+          step.text,
+          error: e,
+          stackTrace: StackTrace.current,
+        );
+        await _hookManager.afterStep(result, _world);
+        rethrow;
+      }
     } else {
+      final String error = 'Step not defined';
       print('${red}Step not defined: ${step.text}$reset');
-      await _hookManager.afterStep(step.text, _world);
-      exit(1);
+      result = StepFailure(
+        step.text,
+        error: error,
+        stackTrace: StackTrace.current,
+      );
+      await _hookManager.afterStep(result, _world);
+      throw Exception(error);
     }
   }
 

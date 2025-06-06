@@ -22,15 +22,21 @@ void main() {
 class MainApp extends StatelessWidget {
   const MainApp({super.key});
 
+  // A global key that lets us find the boundary later.
+  static final GlobalKey repaintBoundaryKey = GlobalKey();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       ),
-      home: ScrollConfiguration(
-        behavior: NoScrollbarBehavior(),
-        child: SafeArea(child: Feed(currentUser: data.user_0)),
+      home: RepaintBoundary(
+        key: repaintBoundaryKey,
+        child: ScrollConfiguration(
+          behavior: NoScrollbarBehavior(),
+          child: SafeArea(child: Feed(currentUser: data.user_0)),
+        ),
       ),
       debugShowCheckedModeBanner: false,
     );

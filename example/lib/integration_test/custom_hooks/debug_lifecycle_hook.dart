@@ -1,4 +1,5 @@
 import 'package:flutter_gherkin_parser/hooks/integration_hook.dart';
+import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
 
 class DebugLifecycleHook extends IntegrationHook {
@@ -31,7 +32,7 @@ class DebugLifecycleHook extends IntegrationHook {
   }
 
   @override
-  Future<void> onAfterStep(String stepText, WidgetTesterWorld world) async {
-    print('[DEBUG HOOK] 🟢 onAfterStep: $stepText');
+  Future<void> onAfterStep(StepResult result, WidgetTesterWorld world) async {
+    print('[DEBUG HOOK] 🟢 onAfterStep: ${result.stepText}');
   }
 }

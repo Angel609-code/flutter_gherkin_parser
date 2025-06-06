@@ -13,6 +13,7 @@ StepDefinitionGeneric andHaveItemsInCategory() {
   return generic2<String, String, WidgetTesterWorld>(
     r'I have (\d+) items? in category ([A-Za-z]+)', (count, category, world) async {
       print('Count: $count, Category: $category');
+      throw 'Produced error';
     },
   );
 }

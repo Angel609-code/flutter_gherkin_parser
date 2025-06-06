@@ -1,4 +1,5 @@
 import 'package:flutter_gherkin_parser/hooks/integration_hook.dart';
+import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
 
 class HookManager {
@@ -36,9 +37,9 @@ class HookManager {
     }
   }
 
-  Future<void> afterStep(String stepText, WidgetTesterWorld world) async {
+  Future<void> afterStep(StepResult result, WidgetTesterWorld world) async {
     for (final hook in _hooks) {
-      await hook.onAfterStep(stepText, world);
+      await hook.onAfterStep(result, world);
     }
   }
 }
