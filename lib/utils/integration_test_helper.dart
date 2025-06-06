@@ -1,6 +1,4 @@
 import 'dart:convert' show jsonDecode;
-import 'dart:io';
-import 'package:flutter/foundation.dart' show ErrorDescription, FlutterError, FlutterErrorDetails;
 import 'package:flutter_gherkin_parser/hooks/hook_manager.dart';
 import 'package:flutter_gherkin_parser/integration_test_config.dart';
 import 'package:flutter_gherkin_parser/models/step_model.dart';
@@ -170,20 +168,41 @@ class IntegrationTestHelper {
     }
   }
 
-  Future<void> _handleTestError(dynamic error, StackTrace stackTrace, String? title, bool isBackground) async {
-    print('${red}Error in ${isBackground ? 'background' : 'scenario'}: $error.$reset');
+  Future<void> _handleTestError(
+    Object error,
+    StackTrace stackTrace,
+    String? title,
+    bool isBackground,
+  ) async {
+    print('${red}Error in ${isBackground ? 'background' : 'scenario "$title"'}:\n$error.$reset');
 
-    FlutterError.reportError(
-      FlutterErrorDetails(
-        exception: error,
-        stack: stackTrace,
-        context: ErrorDescription(
-          'Error during integration test for ${isBackground ? 'background' : 'scenario: "$title"'}',
-        ),
-      ),
-    );
+    const blockedPrefixes = [
+      'packages/flutter_gherkin_parser/',
+    ];
 
-    exit(1); // Exit with error code to indicate test failure
+    final lines = stackTrace.toString().trim().split('\n');
+    final lastByFile = <String, String>{};
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.contains('package') && !blockedPrefixes.any((prefix) => trimmed.contains(prefix))) {
+        final match = RegExp(r'^(.*\.dart)').firstMatch(trimmed);
+        if (match != null) {
+          final file = match.group(1)!;
+          lastByFile[file] = line;
+        }
+      }
+    }
+
+    for (final line in lastByFile.values) {
+      print('${red}$line$reset');
+    }
+
+    final String errorMessage = 'Error on step, skipping remaining steps for '
+        '${isBackground ? 'background' : 'scenario: "$title"'}:\n'
+        '  Cause: $error';
+
+    fail(errorMessage);
   }
 
   List<Step> _parseStepsFromJsonList(List<String> jsonList) {

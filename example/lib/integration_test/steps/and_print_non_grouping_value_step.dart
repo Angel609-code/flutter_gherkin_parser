@@ -12,7 +12,7 @@ StepDefinitionGeneric andPrintNonGroupingValue() {
 StepDefinitionGeneric andPrintNonGroupingValue3() {
   return generic3<String, String, String, WidgetTesterWorld>(
     'I print {string} or maybe this non-grouping(?: with this as param)? or this (one|two)', (value, nonGrouping, anotherValue, context) async {
-      print('Normal value ${value} and Non-grouping value: "$nonGrouping" with $anotherValue');
+      print('Normal value $value and Non-grouping value: "$nonGrouping" with $anotherValue');
     },
   );
 }
