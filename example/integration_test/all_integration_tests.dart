@@ -8,8 +8,7 @@ import 'generated/test_test_runner.dart' as test_test_runner;
 import 'generated/test_regex_driven_test_runner.dart' as test_regex_driven_test_runner;
 
 void main() {
-  config.runningSingleTest = false;
-  IntegrationTestHelper.runAllTest(config);
+  IntegrationTestHelper(config: config);
 
   test_second_example_test_runner.main();
   test_test_runner.main();

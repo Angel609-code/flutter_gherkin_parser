@@ -10,7 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'custom_hooks/debug_lifecycle_hook.dart';
-import 'custom_hooks/screenshot_hook.dart';
 import 'steps/then_read_text_step.dart';
 
 final config = IntegrationTestConfig(
@@ -26,7 +25,6 @@ final config = IntegrationTestConfig(
   },
   hooks: [
     DebugLifecycleHook(),
-    ScreenshotHook(),
   ],
   steps: [
     thenReadTextStep(),

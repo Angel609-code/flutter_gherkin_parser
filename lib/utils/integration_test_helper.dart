@@ -4,62 +4,51 @@ import 'package:flutter_gherkin_parser/integration_test_config.dart';
 import 'package:flutter_gherkin_parser/models/step_model.dart';
 import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/steps/steps_registry.dart';
+import 'package:flutter_gherkin_parser/utils/bootstrap.dart';
 import 'package:flutter_gherkin_parser/utils/terminal_colors.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 
+bool _hooksRegistered = false;
+
 class IntegrationTestHelper {
   final IntegrationTestConfig config;
   final List<String> backgroundSteps;
   final Map<String, List<String>> scenariosAndSteps;
-  final bool startRunningAllTests;
 
   late final HookManager _hookManager;
   late final WidgetTesterWorld _world;
 
   final String _scenarioNameKey = 'scenarioName';
 
-  void init() {
-    setUpAll(() async {
-      await _hookManager.beforeAll();
-    });
-
-    tearDownAll(() async {
-      await _hookManager.afterAll();
-    });
+  void _registerGlobalHooks() {
+    if (!_hooksRegistered) {
+      setUpAll(() => _hookManager.onBeforeAll());
+      tearDownAll(() => _hookManager.onAfterAll());
+      _hooksRegistered = true;
+    }
   }
 
-  IntegrationTestHelper({
-    required this.config,
-    this.scenariosAndSteps = const <String, List<String>>{},
-    this.backgroundSteps = const <String>[],
-    this.startRunningAllTests = false,
+  factory IntegrationTestHelper({
+    required IntegrationTestConfig config,
+    Map<String,List<String>> scenariosAndSteps = const {},
+    List<String> backgroundSteps = const [],
   }) {
-    if (startRunningAllTests) {
-      _hookManager = HookManager(config.hooks);
+    bootstrap(config);
+    return IntegrationTestHelper._(config, scenariosAndSteps, backgroundSteps);
+  }
 
-      init();
-      return;
-    }
-
+  IntegrationTestHelper._(this.config, this.scenariosAndSteps, this.backgroundSteps) {
     _hookManager = HookManager(config.hooks);
-
     _world = WidgetTesterWorld();
-    _world.initialize(onBindingInitialized: config.onBindingInitialized);
+    _world.setBinding(binding);
 
     StepsRegistry.resetToDefaults();
     StepsRegistry.addAll(config.steps);
 
-    if (config.runningSingleTest) {
-      init();
-    }
+    _registerGlobalHooks();
   }
-
-  factory IntegrationTestHelper.runAllTest(IntegrationTestConfig config) => IntegrationTestHelper(
-    config: config,
-    startRunningAllTests: true,
-  );
 
   HookManager get hookManager => _hookManager;
 
@@ -74,85 +63,76 @@ class IntegrationTestHelper {
     final steps = _parseStepsFromJsonList(backgroundSteps);
 
     if (steps.isNotEmpty) {
-      await _performScenarioOrBackground(
-        run: () async {
-          for (final step in steps) {
-            await _executeStep(step, true);
+      try {
+        for (final step in steps) {
+          final StepResult result = await _executeStep(step, false);
+          await _hookManager.onAfterStep(result, _world);
+
+          if (result is StepFailure) {
+            if (result.stackTrace != null) {
+              throw Error.throwWithStackTrace(result.error, result.stackTrace!);
+            } else {
+              throw result.error;
+            }
           }
-        },
-        isBackground: true,
-      );
+        }
+      } catch (error, stackTrace) {
+        await _handleTestError(error, stackTrace, scenarioName, true);
+      }
     }
   }
 
   Future<void> runStepsForScenario() async {
     final String scenarioName = _world.getAttachment(_scenarioNameKey);
-    await _hookManager.beforeScenario(scenarioName);
+    await _hookManager.onBeforeScenario(scenarioName);
 
     final stepsJson = scenariosAndSteps[scenarioName] ?? <String>[];
     final steps = _parseStepsFromJsonList(stepsJson);
-
-    await _performScenarioOrBackground(
-      run: () async {
-        for (final step in steps) {
-          await _executeStep(step, false);
-        }
-      },
-      after: () async {
-        await performTestCleanup();
-      },
-      title: scenarioName,
-    );
-
-    await hookManager.afterScenario(scenarioName);
-  }
-
-  Future<void> _performScenarioOrBackground({
-    required Future<void> Function() run,
-    Future<void> Function()? after,
-    String? title,
-    bool isBackground = false
-  }) async {
     try {
-      await run();
+      for (final step in steps) {
+        final StepResult result = await _executeStep(step, false);
+        await _hookManager.onAfterStep(result, _world);
+
+        if (result is StepFailure) {
+          if (result.stackTrace != null) {
+            throw Error.throwWithStackTrace(result.error, result.stackTrace!);
+          } else {
+            throw result.error;
+          }
+        }
+      }
     } catch (error, stackTrace) {
-      await _handleTestError(error, stackTrace, title, isBackground);
-    } finally {
-      await after?.call();
+      await _handleTestError(error, stackTrace, scenarioName, false);
     }
+
+    await hookManager.onAfterScenario(scenarioName);
   }
 
-  Future<void> _executeStep(Step step, bool isBackground) async {
-    await _hookManager.beforeStep(step.text, _world);
+  Future<StepResult> _executeStep(Step step, bool isBackground) async {
+    await _hookManager.onBeforeStep(step.text, _world);
 
     final stepFunction = StepsRegistry.getStep(step.text);
 
-    StepResult result;
     if (stepFunction != null) {
       try {
         print('$green➔ [${step.source}] ${isBackground ? orange : yellow}Executing${isBackground ? ' background ' : ' '}step: ${step.text}$reset');
         await stepFunction(_world);
-        result = StepSuccess(step.text);
-        await _hookManager.afterStep(result, _world);
-      } catch (e) {
-        result = StepFailure(
+
+        return StepSuccess(step.text);
+      } catch (e, st) {
+        return StepFailure(
           step.text,
           error: e,
-          stackTrace: StackTrace.current,
+          stackTrace: st,
         );
-        await _hookManager.afterStep(result, _world);
-        rethrow;
       }
     } else {
       final String error = 'Step not defined';
       print('${red}Step not defined: ${step.text}$reset');
-      result = StepFailure(
+      return StepFailure(
         step.text,
         error: error,
-        stackTrace: StackTrace.current,
       );
-      await _hookManager.afterStep(result, _world);
-      throw Exception(error);
     }
   }
 
@@ -198,11 +178,9 @@ class IntegrationTestHelper {
       print('${red}$line$reset');
     }
 
-    final String errorMessage = 'Error on step, skipping remaining steps for '
-        '${isBackground ? 'background' : 'scenario: "$title"'}:\n'
-        '  Cause: $error';
+    final String errorMessage = '${red}Error on step, skipping remaining steps for ${isBackground ? 'background' : 'scenario: "$title"'}$reset';
 
-    fail(errorMessage);
+    print(errorMessage);
   }
 
   List<Step> _parseStepsFromJsonList(List<String> jsonList) {

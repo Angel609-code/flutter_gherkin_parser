@@ -10,12 +10,8 @@ import 'package:integration_test/integration_test.dart';
 /// No lifecycle hooks (beforeScenario, beforeStep, etc.) live here.
 /// Those belong in your HookManager or in user‐supplied Hook classes.
 abstract class TestWorld {
-  /// Called once (by the generated runner) as soon as `testWidgets(…)` begins.
-  ///   • Implementers should call `IntegrationTestWidgetsFlutterBinding.ensureInitialized()`
-  ///    • Should capture/store the passed‐in WidgetTester if needed.
-  Future<void> initialize();
-
   Future<void> setTester(WidgetTester tester);
+  Future<void> setBinding(IntegrationTestWidgetsFlutterBinding binding);
 
   /// After initialize() has run, test‐writers can call `world.tester` to do
   /// pump/pumpAndSettle, find widgets, etc.

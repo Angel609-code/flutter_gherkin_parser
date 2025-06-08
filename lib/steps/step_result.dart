@@ -32,14 +32,14 @@ class StepFailure extends StepResult {
   final Object error;
 
   /// The stack trace corresponding to [error].
-  final StackTrace stackTrace;
+  final StackTrace? stackTrace;
 
   /// Create a [StepFailure] for the given [stepText].
   ///
   /// Both [error] and [stackTrace] are required to preserve debugging info.
   StepFailure(
-      super.stepText, {
-        required this.error,
-        required this.stackTrace,
-      });
+    super.stepText, {
+    required this.error,
+    this.stackTrace,
+  });
 }

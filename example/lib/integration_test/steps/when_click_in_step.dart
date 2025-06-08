@@ -8,10 +8,24 @@ StepDefinitionGeneric whenClickWidgetStep() {
     'I click in (text|input|dropdown) with key {string}', (type, key, context) async {
       print('this is the type: $type');
 
-      final finder = find.byKey(ValueKey(key));
-      expect(finder, findsOneWidget);
-      await context.tester.tap(finder);
+      final innerFinder = find.byKey(ValueKey(key));
+
       await context.tester.pumpAndSettle();
+      final fabAncestor = find.ancestor(
+        of: innerFinder,
+        matching: find.byType(FloatingActionButton),
+      );
+
+      expect(fabAncestor, findsOneWidget);
+
+      await context.tester.pumpAndSettle();
+      final center = context.tester.getCenter(fabAncestor);
+      await context.tester.tapAt(center);
+      await context.tester.pumpAndSettle();
+
+      // You can attach and retrieve values from the world between steps.
+      // For example, each step automatically has the "scenarioName" attached.
+      print('This is the current scenario: ${context.getAttachment("scenarioName")}');
     },
   );
 }

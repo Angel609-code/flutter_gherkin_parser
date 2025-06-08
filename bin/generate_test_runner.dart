@@ -214,8 +214,7 @@ Future<void> main(List<String> args) async {
   buffer
     ..writeln()
     ..writeln('void main() {')
-    ..writeln('  config.runningSingleTest = false;')
-    ..writeln('  IntegrationTestHelper.runAllTest(config);')
+    ..writeln('  IntegrationTestHelper(config: config);')
     ..writeln();
 
   for (final line in callLines) {

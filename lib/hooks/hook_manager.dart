@@ -7,39 +7,63 @@ class HookManager {
 
   HookManager(List<IntegrationHook> hooks) : _hooks = [...hooks]..sort((a, b) => b.priority.compareTo(a.priority));
 
-  Future<void> beforeAll() async {
+  Future<void> onBeforeAll() async {
     for (final hook in _hooks) {
-      await hook.onBeforeAll();
+      try {
+        await hook.onBeforeAll();
+      } catch (e, st) {
+        print('🔴 Error in onBeforeAll: $e\n$st');
+      }
     }
   }
 
-  Future<void> afterAll() async {
+  Future<void> onAfterAll() async {
     for (final hook in _hooks) {
-      await hook.onAfterAll();
+      try {
+        await hook.onAfterAll();
+      } catch (e, st) {
+        print('🔴 Error in onAfterAll: $e\n$st');
+      }
     }
   }
 
-  Future<void> beforeScenario(String scenarioName) async {
+  Future<void> onBeforeScenario(String scenarioName) async {
     for (final hook in _hooks) {
-      await hook.onBeforeScenario(scenarioName);
+      try {
+        await hook.onBeforeScenario(scenarioName);
+      } catch (e, st) {
+        print('🔴 Error in onBeforeScenario("$scenarioName"): $e\n$st');
+      }
     }
   }
 
-  Future<void> afterScenario(String scenarioName) async {
+  Future<void> onAfterScenario(String scenarioName) async {
     for (final hook in _hooks) {
-      await hook.onAfterScenario(scenarioName);
+      try {
+        await hook.onAfterScenario(scenarioName);
+      } catch (e, st) {
+        print('🔴 Error in onAfterScenario("$scenarioName"): $e\n$st');
+      }
     }
   }
 
-  Future<void> beforeStep(String stepText, WidgetTesterWorld world) async {
+  Future<void> onBeforeStep(String stepText, WidgetTesterWorld world) async {
     for (final hook in _hooks) {
-      await hook.onBeforeStep(stepText, world);
+      try {
+        await hook.onBeforeStep(stepText, world);
+      } catch (e, st) {
+        print('🔴 Error in onBeforeStep("$stepText"): $e\n$st');
+      }
     }
   }
 
-  Future<void> afterStep(StepResult result, WidgetTesterWorld world) async {
+  Future<void> onAfterStep(StepResult result, WidgetTesterWorld world) async {
     for (final hook in _hooks) {
-      await hook.onAfterStep(result, world);
+      try {
+        await hook.onAfterStep(result, world);
+      } catch (e, st) {
+        print('🔴 Error in onAfterStep("${result.stepText}"): $e\n$st');
+      }
     }
   }
 }
