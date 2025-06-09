@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'package:flutter_gherkin_parser/models/feature_model.dart';
 import 'package:flutter_gherkin_parser/models/json_step_model.dart';
+import 'package:flutter_gherkin_parser/models/report_model.dart';
 import 'package:flutter_gherkin_parser/models/scenario_model.dart';
 import 'package:flutter_gherkin_parser/reporters/integration_reporter.dart';
+import 'package:flutter_gherkin_parser/server/integration_endpoints.dart';
 import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
+
+import '../models/integration_server_result_model.dart';
 
 class JsonReporter extends IntegrationReporter {
   final List<JsonFeature> _features = [];
@@ -94,8 +98,18 @@ class JsonReporter extends IntegrationReporter {
 
   @override
   Future<void> onAfterAll() async {
-    final out = jsonEncode(_features.map((f) => f.toJson()).toList());
-    // print(out);
+    final jsonString = jsonEncode(_features.map((f) => f.toJson()).toList());
+
+    IntegrationServerResult result = await saveReport(ReportBody(
+      content: jsonString,
+      path: path,
+    ));
+
+    if (result.success) {
+      print('🟢 Report saved successfully');
+    } else {
+      print('🔴 Failed to save report ${result.message}');
+    }
   }
 
   @override Future<void> onBeforeAll() async {}

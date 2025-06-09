@@ -1,3 +1,4 @@
+import 'package:example/integration_test/integration_endpoints/say_hello.dart';
 import 'package:flutter_gherkin_parser/hooks/integration_hook.dart';
 import 'package:flutter_gherkin_parser/models/models.dart';
 import 'package:flutter_gherkin_parser/steps/step_result.dart';
@@ -9,6 +10,13 @@ class DebugLifecycleHook extends IntegrationHook {
 
   @override
   Future<void> onBeforeAll() async {
+    final greeting = await sayHello();
+    if (greeting.success) {
+      print('🟢 Server says: ${greeting.message}');
+    } else {
+      print('🔴 Could not reach hello endpoint: ${greeting.message}');
+    }
+
     print('[DEBUG HOOK] 🟡 onBeforeAll');
   }
 

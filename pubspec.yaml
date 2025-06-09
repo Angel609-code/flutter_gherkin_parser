@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.4.0
   mustache_template: ^2.0.0
   path: ^1.9.1
 

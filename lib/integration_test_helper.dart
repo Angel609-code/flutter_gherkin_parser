@@ -2,6 +2,7 @@ import 'dart:convert' show jsonDecode;
 import 'package:flutter_gherkin_parser/integration_test_config.dart';
 import 'package:flutter_gherkin_parser/lifecycle_manager.dart';
 import 'package:flutter_gherkin_parser/models/models.dart';
+import 'package:flutter_gherkin_parser/server/integration_test_server.dart';
 import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/steps/steps_registry.dart';
 import 'package:flutter_gherkin_parser/bootstrap.dart';
@@ -50,6 +51,7 @@ class IntegrationTestHelper {
     required IntegrationTestConfig config,
     Map<String,List<String>> scenariosAndSteps = const {},
     List<String> backgroundSteps = const [],
+    IntegrationTestServer? server,
   }) {
     bootstrap(config);
     return IntegrationTestHelper._(config, scenariosAndSteps, backgroundSteps);

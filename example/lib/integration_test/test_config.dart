@@ -32,7 +32,7 @@ final config = IntegrationTestConfig(
   reporters: [
     SummaryReporter(),
     DecoratedSummaryReporter(),
-    JsonReporter(path: './integration_test/report/report.json'),
+    JsonReporter(path: './report/report.json'),
   ],
   steps: [
     thenReadTextStep(),
