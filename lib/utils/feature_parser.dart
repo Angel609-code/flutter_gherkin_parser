@@ -16,7 +16,12 @@ class FeatureParser {
       final String line = rawLine.trim();
 
       if (line.startsWith('Feature:')) {
-        feature = Feature(name: line.substring('Feature:'.length).trim());
+        feature = Feature(
+          name: line.substring('Feature:'.length).trim(),
+          uri: '/features/$featurePath',
+          line: i + 1,
+        );
+
         inBackground = false;
         continue;
       }
@@ -31,7 +36,11 @@ class FeatureParser {
       if (line.startsWith('Scenario:')) {
         // Stop background collection once a scenario begins
         inBackground = false;
-        currentScenario = Scenario(name: line.substring('Scenario:'.length).trim());
+        currentScenario = Scenario(
+          name: line.substring('Scenario:'.length).trim(),
+          line: i + 1,
+        );
+
         feature?.scenarios.add(currentScenario);
         continue;
       }
@@ -87,7 +96,7 @@ class FeatureParser {
         // Now create the Step with the combined text
         final step = Step(
           text: stepText,
-          source: '/features/$featurePath:${i + 1}',
+          line: i + 1,
         );
 
         if (inBackground) {

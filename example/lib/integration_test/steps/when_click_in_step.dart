@@ -22,10 +22,6 @@ StepDefinitionGeneric whenClickWidgetStep() {
       final center = context.tester.getCenter(fabAncestor);
       await context.tester.tapAt(center);
       await context.tester.pumpAndSettle();
-
-      // You can attach and retrieve values from the world between steps.
-      // For example, each step automatically has the "scenarioName" attached.
-      print('This is the current scenario: ${context.getAttachment("scenarioName")}');
     },
   );
 }

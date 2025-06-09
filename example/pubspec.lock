@@ -270,6 +270,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "14.3.1"
+  wcwidth:
+    dependency: "direct main"
+    description:
+      name: wcwidth
+      sha256: "4e68ce25701e56647cb305ab6d8c75fce5e5196227bcb6ba6886513ac36474c2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.4"
   webdriver:
     dependency: transitive
     description:

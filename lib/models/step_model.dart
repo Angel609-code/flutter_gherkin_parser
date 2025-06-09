@@ -2,24 +2,24 @@ import 'dart:convert' show jsonEncode;
 
 class Step {
   final String text;
-  final String source;
+  final int line;
 
   Step({
     required this.text,
-    required this.source,
+    required this.line,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'text': text,
-      'source': source,
+      'line': line,
     };
   }
 
   factory Step.fromJson(Map<String, dynamic> json) {
     return Step(
       text: json['text'] as String,
-      source: json['source'] as String,
+      line: json['line'] as int,
     );
   }
 

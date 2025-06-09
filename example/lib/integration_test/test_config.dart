@@ -1,4 +1,5 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'package:example/integration_test/reporters/decorated_summary.dart';
 import 'package:example/integration_test/steps/and_enter_text_step.dart';
 import 'package:example/integration_test/steps/and_print_non_grouping_value_step.dart';
 import 'package:example/integration_test/steps/and_print_table_step.dart';
@@ -6,6 +7,8 @@ import 'package:example/integration_test/steps/when_click_in_step.dart';
 import 'package:example/main.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_gherkin_parser/integration_test_config.dart';
+import 'package:flutter_gherkin_parser/reporters/json_reporter.dart';
+import 'package:flutter_gherkin_parser/reporters/summary_reporter.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -25,6 +28,11 @@ final config = IntegrationTestConfig(
   },
   hooks: [
     DebugLifecycleHook(),
+  ],
+  reporters: [
+    SummaryReporter(),
+    DecoratedSummaryReporter(),
+    JsonReporter(path: './integration_test/report/report.json'),
   ],
   steps: [
     thenReadTextStep(),

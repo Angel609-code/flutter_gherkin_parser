@@ -1,10 +1,11 @@
 import 'package:flutter_gherkin_parser/hooks/integration_hook.dart';
+import 'package:flutter_gherkin_parser/models/models.dart';
 import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
 
 class DebugLifecycleHook extends IntegrationHook {
   @override
-  int get priority => 100; // Run first
+  int get priority => 100;
 
   @override
   Future<void> onBeforeAll() async {
@@ -17,8 +18,13 @@ class DebugLifecycleHook extends IntegrationHook {
   }
 
   @override
-  Future<void> onBeforeScenario(String scenarioName) async {
-    print('[DEBUG HOOK] 🟡 onBeforeScenario: $scenarioName');
+  Future<void> onFeatureStarted(FeatureInfo feature) async {
+    print('[DEBUG HOOK] 🟠 onFeatureStarted');
+  }
+
+  @override
+  Future<void> onBeforeScenario(ScenarioInfo scenario) async {
+    print('[DEBUG HOOK] 🟡 onBeforeScenario: ${scenario.scenarioName}');
   }
 
   @override

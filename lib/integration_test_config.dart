@@ -1,4 +1,5 @@
 import 'package:flutter_gherkin_parser/hooks/integration_hook.dart';
+import 'package:flutter_gherkin_parser/reporters/integration_reporter.dart';
 import 'package:flutter_gherkin_parser/utils/step_definition_generic.dart';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -33,6 +34,8 @@ class IntegrationTestConfig {
   /// Hooks are composable and executed in order of descending [priority].
   final List<IntegrationHook> hooks;
 
+  final List<IntegrationReporter> reporters;
+
   /// [Future Feature] Optional list of step definitions to override or extend the registry.
   ///
   /// Leave empty for now.
@@ -42,6 +45,7 @@ class IntegrationTestConfig {
     required this.appLauncher,
     this.onBindingInitialized,
     this.hooks = const [],
+    this.reporters = const [],
     this.steps = const [],
   });
 }

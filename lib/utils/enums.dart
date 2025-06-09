@@ -1,0 +1,1 @@
+enum ScenarioStatus { passed, failed, skipped }

@@ -106,4 +106,15 @@ class GherkinTable {
 
     return GherkinTable(copiedRows, copiedHeader);
   }
+
+  List<Map<String, dynamic>> toJsonRows() {
+    final out = <Map<String, dynamic>>[];
+    if (header != null) {
+      out.add({ 'cells': header!.toList() });
+    }
+    for (final row in rows) {
+      out.add({ 'cells': row.toList() });
+    }
+    return out;
+  }
 }
