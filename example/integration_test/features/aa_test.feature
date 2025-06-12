@@ -1,3 +1,4 @@
+@smoke
 Feature: Testing the fill text form field
 
 Background:

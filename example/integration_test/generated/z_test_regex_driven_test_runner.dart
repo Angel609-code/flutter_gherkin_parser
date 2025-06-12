@@ -29,7 +29,8 @@ void main() async {
     testWidgets('Scenario: Items in category', (WidgetTester tester) async {
       final ScenarioInfo scenario = ScenarioInfo(
         scenarioName: 'Items in category',
-        line: 6,
+        line: 7,
+        tags: ['@ToFail'],
       );
 
       await helper.setUp(tester, scenario);
@@ -39,7 +40,7 @@ void main() async {
     testWidgets('Scenario: Print with optional height and age', (WidgetTester tester) async {
       final ScenarioInfo scenario = ScenarioInfo(
         scenarioName: 'Print with optional height and age',
-        line: 10,
+        line: 11,
       );
 
       await helper.setUp(tester, scenario);
@@ -49,7 +50,7 @@ void main() async {
     testWidgets('Scenario: Match multiple groups', (WidgetTester tester) async {
       final ScenarioInfo scenario = ScenarioInfo(
         scenarioName: 'Match multiple groups',
-        line: 14,
+        line: 15,
       );
 
       await helper.setUp(tester, scenario);
@@ -59,7 +60,8 @@ void main() async {
     testWidgets('Scenario: Process multiline text', (WidgetTester tester) async {
       final ScenarioInfo scenario = ScenarioInfo(
         scenarioName: 'Process multiline text',
-        line: 18,
+        line: 20,
+        tags: ['@wip'],
       );
 
       await helper.setUp(tester, scenario);
@@ -69,7 +71,7 @@ void main() async {
     testWidgets('Scenario: Process six captures', (WidgetTester tester) async {
       final ScenarioInfo scenario = ScenarioInfo(
         scenarioName: 'Process six captures',
-        line: 22,
+        line: 24,
       );
 
       await helper.setUp(tester, scenario);
@@ -89,23 +91,23 @@ final Map<String, List<String>> _scenariosAndSteps = {
     r'''{"text":"When I enter \"searchTerm\" into the search","line":4}''',
   ],
   'Items in category': [
-    r'''{"text":"Given I have 5 items in category Books","line":7}''',
-    r'''{"text":"And   I have 1 item in category Toys","line":8}''',
+    r'''{"text":"Given I have 5 items in category Books","line":8}''',
+    r'''{"text":"And   I have 1 item in category Toys","line":9}''',
   ],
   'Print with optional height and age': [
-    r'''{"text":"Then I print Alice with height 170cm and age 30","line":11}''',
-    r'''{"text":"And  I print Bob and age 25","line":12}''',
+    r'''{"text":"Then I print Alice with height 170cm and age 30","line":12}''',
+    r'''{"text":"And  I print Bob and age 25","line":13}''',
   ],
   'Match multiple groups': [
-    r'''{"text":"When I do foo at position 42 end with code A1B2 and flag 0","line":15}''',
-    r'''{"text":"And  I do bar at position 7 end with code FFFF and flag 1","line":16}''',
+    r'''{"text":"When I do foo at position 42 end with code A1B2 and flag 0","line":16}''',
+    r'''{"text":"And  I do bar at position 7 end with code FFFF and flag 1","line":17}''',
   ],
   'Process multiline text': [
-    r'''{"text":"Then I see text: Hello world END section Main, number 10, flag 1, type urgent","line":19}''',
-    r'''{"text":"And  I see text: Another block of text including spaces END section Sec1, number 5, flag 0, type normal","line":20}''',
+    r'''{"text":"Then I see text: Hello world END section Main, number 10, flag 1, type urgent","line":21}''',
+    r'''{"text":"And  I see text: Another block of text including spaces END section Sec1, number 5, flag 0, type normal","line":22}''',
   ],
   'Process six captures': [
-    r'''{"text":"Given I process Task1 and foo at 250ms for code ABC1 with user \"john\" in group Admin","line":23}''',
-    r'''{"text":"And   I process Report and bar at 100ms for code 1F2E with user \"alice\" in group Users","line":24}''',
+    r'''{"text":"Given I process Task1 and foo at 250ms for code ABC1 with user \"john\" in group Admin","line":25}''',
+    r'''{"text":"And   I process Report and bar at 100ms for code 1F2E with user \"alice\" in group Users","line":26}''',
   ],
 };

@@ -27,6 +27,7 @@ class JsonReporter extends IntegrationReporter {
       id : feature.featureName.toLowerCase().replaceAll(' ', '-'),
       name: feature.featureName,
       line: feature.line,
+      tags: feature.tags.map((t) => JsonTag(t, feature.line - 1)).toList(),
     );
 
     _features.add(_currentFeature!);
@@ -45,6 +46,7 @@ class JsonReporter extends IntegrationReporter {
       id: scenarioId,
       name: scenario.scenarioName,
       line: scenario.line,
+      tags: scenario.tags.map((t) => JsonTag(t, scenario.line - 1)).toList(),
     );
     _currentFeature!.elements.add(_currentScenario!);
   }

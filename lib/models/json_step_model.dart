@@ -53,6 +53,7 @@ class JsonScenario {
   final String description;
   final String type;
   final int line;
+  final List<JsonTag> tags;
   final List<JsonStep> steps;
 
   JsonScenario({
@@ -62,6 +63,7 @@ class JsonScenario {
     this.description = '',
     this.type = 'scenario',
     required this.line,
+    this.tags = const <JsonTag>[],
     List<JsonStep>? steps,
   }) : steps = steps ?? <JsonStep>[];
 
@@ -72,6 +74,7 @@ class JsonScenario {
     'description': description,
     'type': type,
     'line': line,
+    'tags': tags,
     'steps': steps.map((s) => s.toJson()).toList(),
   };
 
@@ -86,6 +89,7 @@ class JsonFeature {
   final String name;
   final String description;
   final int line;
+  final List<JsonTag> tags;
   final List<JsonScenario> elements;
 
   JsonFeature({
@@ -95,7 +99,8 @@ class JsonFeature {
     required this.name,
     this.description = '',
     required this.line,
-    List<JsonScenario>? elements,
+    this.tags = const <JsonTag>[],
+  List<JsonScenario>? elements,
   }) : elements = elements ?? <JsonScenario>[];
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -105,9 +110,25 @@ class JsonFeature {
     'name': name,
     'description': description,
     'line': line,
+    'tags': tags,
     'elements': elements.map((e) => e.toJson()).toList(),
   };
 
   @override
   String toString() => jsonEncode(toJson());
 }
+
+class JsonTag {
+  final String name;
+  final int line;
+
+  JsonTag(this.name, this.line);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'line': line,
+    };
+  }
+}
+

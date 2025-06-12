@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
+import 'package:flutter_gherkin_parser/utils/expression_evaluator.dart';
 import 'package:mustache_template/mustache_template.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_gherkin_parser/utils/feature_parser.dart';
@@ -47,6 +48,23 @@ Future<void> main(List<String> args) async {
     } else if (a == '--pattern' && i + 1 < args.length) {
       patternArg = args[++i];
     }
+  }
+
+  /// parse --tags optional
+  String? tagsArg;
+  for (var i = 0; i < args.length; i++) {
+    final a = args[i];
+    if (a.startsWith('--tags=')) {
+      tagsArg = a.split('=')[1];
+    } else if (a == '--tags' && i + 1 < args.length) {
+      tagsArg = args[++i];
+    }
+  }
+
+  TagExpr? tagFilter;
+
+  if (tagsArg != null && tagsArg.trim().isNotEmpty) {
+    tagFilter = parseTagExpression(tagsArg);
   }
 
   // Locate features directory
@@ -113,6 +131,25 @@ Future<void> main(List<String> args) async {
     final raw = featureFile.readAsStringSync();
     final feature = parser.parse(raw, relPath);
 
+    // If we have a tagFilter, prune scenarios (and skip if none remain)
+    if (tagFilter != null) {
+      // Keep only scenarios that match
+      final kept = feature.scenarios.where((sc) {
+        // combine feature+scenario tags
+        final tags = {...feature.tags, ...sc.tags}.toSet();
+        return tagFilter!.evaluate(tags);
+      }).toList();
+
+      if (kept.isEmpty) {
+        stdout.writeln('Skipping feature `${feature.name}`—no scenarios match tags `$tagsArg`');
+        continue; // skip generating this feature’s runner entirely
+      }
+
+      feature.scenarios
+        ..clear()
+        ..addAll(kept);
+    }
+
     // Validate single Feature and at most one Background
     final featureCount = RegExp(r'^\s*Feature:', multiLine: true)
         .allMatches(raw).length;
@@ -139,20 +176,24 @@ Future<void> main(List<String> args) async {
       scenarioMaps.add({
         'name': scenario.name,
         'line': scenario.line,
+        'tags': scenario.tags.map((e) => "'$e'").toList(),
         'steps': scenario.steps.map((s) => {'json': s.toString()}).toList(),
         'isLast': i == feature.scenarios.length - 1,
       });
     }
+
     final featureData = {
       'name': feature.name,
       'uri': feature.uri,
       'line': feature.line,
+      'tags': feature.tags.map((e) => "'$e'").toList(),
       'scenarios': scenarioMaps,
       'backgroundSteps': feature.background?.steps
           .map((s) => {'jsonStep': s.toString()})
           .toList() ?? [],
       'hasBackgroundSteps': feature.background?.steps.isNotEmpty ?? false,
     };
+
     final rendered = template.renderString({
       'features': [featureData],
       'configImport': configImport,

@@ -20,7 +20,7 @@ void main() async {
     testWidgets('Scenario: Filling input', (WidgetTester tester) async {
       final ScenarioInfo scenario = ScenarioInfo(
         scenarioName: 'Filling input',
-        line: 12,
+        line: 13,
       );
 
       await helper.setUp(tester, scenario);
@@ -30,7 +30,7 @@ void main() async {
     testWidgets('Scenario: Checking a second scenario', (WidgetTester tester) async {
       final ScenarioInfo scenario = ScenarioInfo(
         scenarioName: 'Checking a second scenario',
-        line: 16,
+        line: 17,
       );
 
       await helper.setUp(tester, scenario);
@@ -42,23 +42,24 @@ void main() async {
 FeatureInfo _featureInfo = FeatureInfo(
   featureName: 'Testing the fill text form field',
   uri: '/features/aa_test.feature',
-  line: 1,
+  line: 2,
+  tags: ['@smoke'],
 );
 
 final List<String> _backgroundSteps = <String>[
-  r'''{"text":"Given I fill the \"search\" field with \"\"","line":4}''',
-  r'''{"text":"And I should see \"Este programa de comida es para ti\"","line":5}''',
-  r'''{"text":"And I print table \"<<<{\"header\":[\"N\",\"Nombre\",\"estado\"],\"rows\":[[\"1\",\"John\",\"0\"],[\"2\",\"Jean\",\"1\"]]}>>>\"","line":9}''',
-  r'''{"text":"And I click in input with key \"floatingButton\"","line":10}''',
+  r'''{"text":"Given I fill the \"search\" field with \"\"","line":5}''',
+  r'''{"text":"And I should see \"Este programa de comida es para ti\"","line":6}''',
+  r'''{"text":"And I print table \"<<<{\"header\":[\"N\",\"Nombre\",\"estado\"],\"rows\":[[\"1\",\"John\",\"0\"],[\"2\",\"Jean\",\"1\"]]}>>>\"","line":10}''',
+  r'''{"text":"And I click in input with key \"floatingButton\"","line":11}''',
 ];
 
 final Map<String, List<String>> _scenariosAndSteps = {
   'Filling input': [
-    r'''{"text":"And I fill the \"search\" field with \"Tofu\"","line":13}''',
-    r'''{"text":"And I fill the \"search\" field with \"Club\"","line":14}''',
+    r'''{"text":"And I fill the \"search\" field with \"Tofu\"","line":14}''',
+    r'''{"text":"And I fill the \"search\" field with \"Club\"","line":15}''',
   ],
   'Checking a second scenario': [
-    r'''{"text":"And I fill the \"search\" field with \"\"","line":17}''',
-    r'''{"text":"And I fill the \"search\" field with \"Tofu\"","line":18}''',
+    r'''{"text":"And I fill the \"search\" field with \"\"","line":18}''',
+    r'''{"text":"And I fill the \"search\" field with \"Tofu\"","line":19}''',
   ],
 };

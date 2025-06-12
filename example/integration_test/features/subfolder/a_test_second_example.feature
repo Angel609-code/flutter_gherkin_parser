@@ -1,5 +1,6 @@
 Feature: Testing the fill text form field 2
 
+@slow
 Scenario: Second example of escenario
     And I fill the "search" field with "Tofu"
     And I check non-grouping

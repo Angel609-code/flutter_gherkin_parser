@@ -7,6 +7,7 @@ class FeatureParser {
     Feature? feature;
     Scenario? currentScenario;
     bool inBackground = false;
+    List<String> pendingTags = [];
 
     // Regex to detect a “pure table row” (a line that starts and ends with '|')
     final tableRowRegex = RegExp(r'^\s*\|.*\|\s*$');
@@ -15,17 +16,32 @@ class FeatureParser {
       final String rawLine = rawLines[i];
       final String line = rawLine.trim();
 
+      // Tag lines (start with @)
+      if (line.startsWith('@')) {
+        final List<String> tagsOnLine = line
+            .split(RegExp(r'\s+'))
+            .map((t) => t)
+            .toList();
+
+        pendingTags.addAll(tagsOnLine);
+        continue;
+      }
+
+      // Feature declaration
       if (line.startsWith('Feature:')) {
         feature = Feature(
           name: line.substring('Feature:'.length).trim(),
           uri: '/features/$featurePath',
           line: i + 1,
+          tags: pendingTags,
         );
 
+        pendingTags = [];
         inBackground = false;
         continue;
       }
 
+      // Background start
       if (line.startsWith('Background:')) {
         // Start collecting background steps
         inBackground = true;
@@ -39,9 +55,11 @@ class FeatureParser {
         currentScenario = Scenario(
           name: line.substring('Scenario:'.length).trim(),
           line: i + 1,
+          tags: pendingTags,
         );
 
         feature?.scenarios.add(currentScenario);
+        pendingTags = [];
         continue;
       }
 
