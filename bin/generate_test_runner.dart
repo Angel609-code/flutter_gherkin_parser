@@ -38,6 +38,17 @@ Future<void> main(List<String> args) async {
     }
   }
 
+  /// Parse --pattern (optional, as a Dart RegExp)
+  String? patternArg;
+  for (var i = 0; i < args.length; i++) {
+    final a = args[i];
+    if (a.startsWith('--pattern=')) {
+      patternArg = a.split('=')[1];
+    } else if (a == '--pattern' && i + 1 < args.length) {
+      patternArg = args[++i];
+    }
+  }
+
   // Locate features directory
   final cwd = Directory.current.path;
   final featuresDir = Directory(p.join(cwd, 'integration_test', 'features'));
@@ -46,20 +57,38 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
+  // Load template
+  final parser = FeatureParser();
+  List<File> featureFiles = featuresDir
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.feature'))
+      .toList();
+
+  if (patternArg != null && patternArg.isNotEmpty) {
+    final regex = RegExp(patternArg);
+
+    featureFiles = featureFiles.where((f) {
+      // relative path, e.g. "foo/bar/a_test_xyz.feature"
+      final relPath = p.relative(f.path, from: featuresDir.path);
+      return regex.hasMatch(relPath);
+    }).toList();
+
+    if (featureFiles.isEmpty) {
+      stderr.writeln(
+          'No feature files matching pattern `$patternArg` under '
+              '${featuresDir.path}'
+      );
+      exit(0);
+    }
+  }
+
   // Prepare generated/ folder
   final generatedRoot = Directory(p.join(cwd, 'integration_test', 'generated'));
   if (generatedRoot.existsSync()) {
     generatedRoot.deleteSync(recursive: true);
   }
   generatedRoot.createSync(recursive: true);
-
-  // Load template
-  final parser = FeatureParser();
-  final featureFiles = featuresDir
-      .listSync(recursive: true)
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.feature'))
-      .toList();
 
   final templateUri = await Isolate.resolvePackageUri(
     Uri.parse('package:flutter_gherkin_parser/templates/test_runner_template.mustache'),
