@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 import 'package:mustache_template/mustache_template.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_gherkin_parser/utils/feature_parser.dart';
@@ -7,15 +8,15 @@ import 'package:flutter_gherkin_parser/utils/feature_parser.dart';
 /// Entrypoint for the CLI that generates one test runner file per feature.
 ///
 /// Usage:
-///   dart run flutter_gherkin_parser:generate_test_runner [--config PATH]
+///   dart run flutter_gherkin_parser:generate_test_runner
+///     --config PATH
+///     [--order none|alphabetically|basename]
 Future<void> main(List<String> args) async {
-  // Determine if the user provided a custom config path
+  // Parse --config
   final rawConfigArgIndex = args.indexOf('--config');
   final configPath = (rawConfigArgIndex >= 0 && rawConfigArgIndex + 1 < args.length)
       ? args[rawConfigArgIndex + 1]
       : null;
-
-  // Require `--config PATH` and exit if missing
   if (configPath == null || configPath.trim().isEmpty) {
     stderr.writeln(
         'Error: `--config PATH` is required. '
@@ -24,11 +25,20 @@ Future<void> main(List<String> args) async {
     );
     exit(1);
   }
-
-  // Build the import line using the user‐supplied config (no default fallback)
   final configImport = "import '$configPath';";
 
-  // Locate the current working directory, expecting `integration_test/features/`
+  // Parse --order (none, alphabetically, basename, reverse, random[:seed])
+  String order = 'none';
+  for (var i = 0; i < args.length; i++) {
+    final a = args[i];
+    if (a.startsWith('--order=')) {
+      order = a.split('=')[1];
+    } else if (a == '--order' && i + 1 < args.length) {
+      order = args[++i];
+    }
+  }
+
+  // Locate features directory
   final cwd = Directory.current.path;
   final featuresDir = Directory(p.join(cwd, 'integration_test', 'features'));
   if (!featuresDir.existsSync()) {
@@ -36,16 +46,14 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
-  // Prepare the output folder `integration_test/generated/`
+  // Prepare generated/ folder
   final generatedRoot = Directory(p.join(cwd, 'integration_test', 'generated'));
-  // DELETE any existing generated/ tree entirely:
   if (generatedRoot.existsSync()) {
     generatedRoot.deleteSync(recursive: true);
   }
-  // Now recreate it (empty)
   generatedRoot.createSync(recursive: true);
 
-  // Parse each `.feature` file under `integration_test/features/`
+  // Load template
   final parser = FeatureParser();
   final featureFiles = featuresDir
       .listSync(recursive: true)
@@ -53,194 +61,166 @@ Future<void> main(List<String> args) async {
       .where((f) => f.path.endsWith('.feature'))
       .toList();
 
-  // Resolve the Mustache template bundled in this package
   final templateUri = await Isolate.resolvePackageUri(
     Uri.parse('package:flutter_gherkin_parser/templates/test_runner_template.mustache'),
   );
-
   if (templateUri == null) {
     stderr.writeln(
-      'Cannot resolve package URI for '
-          '`package:flutter_gherkin_parser/templates/test_runner_template.mustache`',
+        'Cannot resolve package URI for '
+            '`package:flutter_gherkin_parser/templates/test_runner_template.mustache`'
     );
     exit(2);
   }
-
   final templateFile = File.fromUri(templateUri);
   if (!templateFile.existsSync()) {
     stderr.writeln('Cannot find template at ${templateFile.path}');
     exit(2);
   }
+  final template = Template(templateFile.readAsStringSync(), htmlEscapeValues: false);
 
-  final templateContent = templateFile.readAsStringSync();
-  final template = Template(templateContent, htmlEscapeValues: false);
-
-  // Generate one runner per feature, preserving subfolder structure
+  // Generate one runner per feature
   for (final featureFile in featureFiles) {
-    // Compute the feature’s path relative to `featuresDir`
     final relPath = p.relative(featureFile.path, from: featuresDir.path);
     final raw = featureFile.readAsStringSync();
     final feature = parser.parse(raw, relPath);
 
-    // Exactly one Feature
+    // Validate single Feature and at most one Background
     final featureCount = RegExp(r'^\s*Feature:', multiLine: true)
-        .allMatches(raw)
-        .length;
-
+        .allMatches(raw).length;
     if (featureCount != 1) {
       stderr.writeln(
-          'Error: Expected exactly one "Feature:" declaration in "${featureFile.path}", '
-              'but found $featureCount.\n'
-              'Each .feature file may have exactly one top‐level Feature.'
+          'Error: Expected exactly one "Feature:" in "${featureFile.path}", '
+              'but found $featureCount.'
       );
       exit(1);
     }
-
-    // Reject any file that has more than one "Background:" line.
     final backgroundCount = RegExp(r'^\s*Background:', multiLine: true)
-        .allMatches(raw)
-        .length;
-
+        .allMatches(raw).length;
     if (backgroundCount > 1) {
       stderr.writeln(
-          'Error: More than one Background section found in "${featureFile.path}".\n'
-              'A feature file may have at most one Background block.'
+          'Error: More than one Background in "${featureFile.path}".'
       );
       exit(1);
     }
 
-    // Prepare the scenarios list with `isLast` flag
-    final scenarioMaps = <Map<String, dynamic>>[];
+    // Build Mustache data
+    final scenarioMaps = <Map<String,dynamic>>[];
     for (var i = 0; i < feature.scenarios.length; i++) {
       final scenario = feature.scenarios[i];
-      final isLast = i == feature.scenarios.length - 1;
-
       scenarioMaps.add({
         'name': scenario.name,
         'line': scenario.line,
-        'steps': scenario.steps.map((s) {
-          return {'json': s.toString()};
-        }).toList(),
-        'isLast': isLast,
+        'steps': scenario.steps.map((s) => {'json': s.toString()}).toList(),
+        'isLast': i == feature.scenarios.length - 1,
       });
     }
-
-    // Prepare the data map for Mustache rendering
     final featureData = {
       'name': feature.name,
       'uri': feature.uri,
       'line': feature.line,
       'scenarios': scenarioMaps,
-      'backgroundSteps': feature.background?.steps.map((s) {
-        return { 'jsonStep': s.toString() };
-      }).toList() ?? [],
+      'backgroundSteps': feature.background?.steps
+          .map((s) => {'jsonStep': s.toString()})
+          .toList() ?? [],
       'hasBackgroundSteps': feature.background?.steps.isNotEmpty ?? false,
     };
-
-    final data = {
+    final rendered = template.renderString({
       'features': [featureData],
       'configImport': configImport,
-    };
+    });
 
-    final rendered = template.renderString(data);
-
-    // Remove `.feature` extension and append `_test_runner.dart`
+    // Write runner file
     final withoutExt = p.withoutExtension(relPath);
-    final runnerRelPath = '${withoutExt}_test_runner.dart';
-
-    // Build the full output path under `integration_test/generated/`
-    final outFilePath = p.join(generatedRoot.path, runnerRelPath);
+    final outFilePath = p.join(
+        generatedRoot.path,
+        '${withoutExt}_test_runner.dart'
+    );
     final outFile = File(outFilePath);
-
-    // Ensure the parent directory exists
-    if (!outFile.parent.existsSync()) {
-      outFile.parent.createSync(recursive: true);
-    }
-
-    // Write the rendered Dart code
+    outFile.parent.createSync(recursive: true);
     outFile.writeAsStringSync(rendered);
     stdout.writeln('Generated $outFilePath');
   }
 
-  // Generating master runner
+  // Generate master runner
   final genDir = Directory('integration_test/generated');
-  if (!genDir.existsSync()) {
-    stderr.writeln('integration_test/generated/ does not exist.');
-    exit(1);
-  }
-
-  // Gather all .dart files under integration_test/generated/ recursively
-  final allFiles = genDir
+  List<File> allFiles = genDir
       .listSync(recursive: true)
       .whereType<File>()
       .where((f) => f.path.endsWith('.dart'))
       .toList();
+
+  // Apply ordering
+  switch (order) {
+    case 'alphabetically':
+      allFiles.sort((a, b) => a.path.compareTo(b.path));
+      break;
+    case 'basename':
+      allFiles.sort((a, b) {
+        final na = p.basenameWithoutExtension(a.path);
+        final nb = p.basenameWithoutExtension(b.path);
+        return na.compareTo(nb);
+      });
+      break;
+    case 'random':
+    case var s when s.startsWith('random:'):
+    // random[:seed]
+      final parts = order.split(':');
+      final rng = (parts.length == 2 && int.tryParse(parts[1]) != null)
+          ? Random(int.parse(parts[1]))
+          : Random();
+      allFiles.shuffle(rng);
+      break;
+    case 'reverse':
+      allFiles = allFiles.reversed.toList();
+      break;
+    case 'none':
+    default:
+    // leave in filesystem discovery order
+      break;
+  }
 
   if (allFiles.isEmpty) {
     stderr.writeln('No .dart files found under integration_test/generated/.');
     exit(0);
   }
 
-  // Count how many times each basename appears
-  final Map<String, int> basenameCount = {};
-  for (final file in allFiles) {
-    final rel = p.relative(file.path, from: 'integration_test');
-    final base = p.basenameWithoutExtension(rel);
+  // Build import and call lists
+  final basenameCount = <String,int>{};
+  for (var file in allFiles) {
+    final base = p.basenameWithoutExtension(p.relative(file.path, from: 'integration_test'));
     basenameCount[base] = (basenameCount[base] ?? 0) + 1;
   }
+  final importLines = <String>[];
+  final callLines = <String>[];
+  final usedSoFar = <String,int>{};
 
-  // For each file, decide on a unique alias and store it
-  final List<String> importLines = [];
-  final List<String> callLines = [];
-  final Map<String, int> usedSoFar = {};
-
-  for (final file in allFiles) {
-    final relativePath = p.relative(file.path, from: 'integration_test');
-    final baseName = p.basenameWithoutExtension(relativePath);
-
-    // Determine alias:
-    final countOfBase = basenameCount[baseName]!;
-    String alias;
-    if (countOfBase > 1) {
-      // If multiple files share the same basename, append _<n>
-      final nextIndex = (usedSoFar[baseName] ?? 0) + 1;
-      usedSoFar[baseName] = nextIndex;
-      alias = '${baseName}_$nextIndex';
-    } else {
-      // If basename is unique, just use it
-      alias = baseName;
-      usedSoFar[baseName] = 1;
-    }
-
-    importLines.add("import '$relativePath' as $alias;");
+  for (var file in allFiles) {
+    final rel = p.relative(file.path, from: 'integration_test');
+    final base = p.basenameWithoutExtension(rel);
+    final cnt = basenameCount[base]!;
+    final idx = (usedSoFar[base] ?? 0) + 1;
+    usedSoFar[base] = idx;
+    final alias = cnt > 1 ? '${base}_$idx' : base;
+    importLines.add("import '$rel' as $alias;");
     callLines.add('  $alias.main();');
   }
 
-  // Build the master runner file content
+  // Write master runner
   final buffer = StringBuffer()
     ..writeln('// DO NOT EDIT MANUALLY. Generated by flutter_gherkin_parser.')
     ..writeln()
     ..writeln("import 'package:flutter_gherkin_parser/integration_test_helper.dart';")
     ..writeln(configImport)
     ..writeln();
-
-  for (final line in importLines) {
-    buffer.writeln(line);
-  }
-
+  importLines.forEach(buffer.writeln);
   buffer
     ..writeln()
     ..writeln('void main() {')
     ..writeln('  IntegrationTestHelper(config: config);')
     ..writeln();
-
-  for (final line in callLines) {
-    buffer.writeln(line);
-  }
-
+  callLines.forEach(buffer.writeln);
   buffer.writeln('}');
 
-  // Write out integration_test/all_integration_tests.dart
   final outFile = File('integration_test/all_integration_tests.dart');
   outFile.createSync(recursive: true);
   outFile.writeAsStringSync(buffer.toString());
@@ -249,6 +229,5 @@ Future<void> main(List<String> args) async {
       'Generated integration_test/all_integration_tests.dart '
           'with ${allFiles.length} runners.'
   );
-
   stdout.writeln('\n✅  All runners generated successfully.');
 }

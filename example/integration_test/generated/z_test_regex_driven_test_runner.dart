@@ -80,7 +80,7 @@ void main() async {
 
 FeatureInfo _featureInfo = FeatureInfo(
   featureName: 'Testing regex‐driven step definitions',
-  uri: '/features/test_regex_driven.feature',
+  uri: '/features/z_test_regex_driven.feature',
   line: 1,
 );
 

@@ -41,7 +41,7 @@ void main() async {
 
 FeatureInfo _featureInfo = FeatureInfo(
   featureName: 'Testing the fill text form field',
-  uri: '/features/test.feature',
+  uri: '/features/aa_test.feature',
   line: 1,
 );
 

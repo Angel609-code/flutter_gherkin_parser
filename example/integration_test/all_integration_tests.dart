@@ -3,16 +3,16 @@
 import 'package:flutter_gherkin_parser/integration_test_helper.dart';
 import 'package:example/integration_test/test_config.dart';
 
-import 'generated/subfolder/third_second_example_test_runner.dart' as third_second_example_test_runner;
-import 'generated/subfolder/test_second_example_test_runner.dart' as test_second_example_test_runner;
-import 'generated/test_test_runner.dart' as test_test_runner;
-import 'generated/test_regex_driven_test_runner.dart' as test_regex_driven_test_runner;
+import 'generated/aa_test_test_runner.dart' as aa_test_test_runner;
+import 'generated/subfolder/a_test_second_example_test_runner.dart' as a_test_second_example_test_runner;
+import 'generated/subfolder/c_third_second_example_test_runner.dart' as c_third_second_example_test_runner;
+import 'generated/z_test_regex_driven_test_runner.dart' as z_test_regex_driven_test_runner;
 
 void main() {
   IntegrationTestHelper(config: config);
 
-  third_second_example_test_runner.main();
-  test_second_example_test_runner.main();
-  test_test_runner.main();
-  test_regex_driven_test_runner.main();
+  aa_test_test_runner.main();
+  a_test_second_example_test_runner.main();
+  c_third_second_example_test_runner.main();
+  z_test_regex_driven_test_runner.main();
 }

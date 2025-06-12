@@ -30,7 +30,7 @@ void main() async {
 
 FeatureInfo _featureInfo = FeatureInfo(
   featureName: 'Testing the fill text form field 2',
-  uri: '/features/subfolder/test_second_example.feature',
+  uri: '/features/subfolder/a_test_second_example.feature',
   line: 1,
 );
 

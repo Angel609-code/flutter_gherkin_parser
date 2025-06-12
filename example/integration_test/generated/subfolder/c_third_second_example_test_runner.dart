@@ -31,7 +31,7 @@ void main() async {
 
 FeatureInfo _featureInfo = FeatureInfo(
   featureName: 'Testing fail on background',
-  uri: '/features/subfolder/third_second_example.feature',
+  uri: '/features/subfolder/c_third_second_example.feature',
   line: 1,
 );
 
