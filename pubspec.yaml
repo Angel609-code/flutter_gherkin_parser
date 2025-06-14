@@ -22,7 +22,7 @@ dev_dependencies:
     sdk: flutter
 
 executables:
-  generate_test_runner: bin/generate_test_runner.dart
+  generate_tests: bin/generate_tests.dart
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

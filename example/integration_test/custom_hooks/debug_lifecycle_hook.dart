@@ -1,8 +1,10 @@
-import 'package:example/integration_test/integration_endpoints/say_hello.dart';
+
 import 'package:flutter_gherkin_parser/hooks/integration_hook.dart';
 import 'package:flutter_gherkin_parser/models/models.dart';
 import 'package:flutter_gherkin_parser/steps/step_result.dart';
 import 'package:flutter_gherkin_parser/world/widget_tester_world.dart';
+
+import '../integration_endpoints/say_hello.dart';
 
 class DebugLifecycleHook extends IntegrationHook {
   @override
